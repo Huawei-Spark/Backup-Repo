@@ -92,8 +92,9 @@
     <!--
       Overridable test home. So that you can call individual pom files directory without
       things breaking.
+      <spark.test.home>${session.executionRootDirectory}</spark.test.home>
     -->
-    <spark.test.home>${session.executionRootDirectory}</spark.test.home>
+    <spark.hbase.test.home>${basedir}</spark.hbase.test.home>
 
     <PermGen>64m</PermGen>
     <MaxPermGen>512m</MaxPermGen>
@@ -537,6 +538,18 @@
       <artifactId>junit-interface</artifactId>
       <version>0.10</version>
       <scope>test</scope>
+    </dependency>
+
+    <!--
+  This dependency has been added to provided scope as it is needed for executing build
+  specific groovy scripts using gmaven+ and not required for downstream project building
+  with spark.
+-->
+    <dependency>
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy-all</artifactId>
+      <version>2.3.7</version>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 
@@ -1200,10 +1213,11 @@
           </execution>
         </executions>
       </plugin>
+      <!-- This plugin dumps the test classpath into a file -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>2.4</version>
+        <version>2.9</version>
         <executions>
           <execution>
             <id>copy-dependencies</id>
@@ -1222,9 +1236,42 @@
               <includeGroupIds>org.datanucleus</includeGroupIds>
             </configuration>
           </execution>
+          <execution>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <includeScope>test</includeScope>
+              <outputFile>${test_classpath_file}</outputFile>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 
+
+      <!-- This plugin reads a file into maven property. And it lets us write groovy !! -->
+      <plugin>
+        <groupId>org.codehaus.gmavenplus</groupId>
+        <artifactId>gmavenplus-plugin</artifactId>
+        <version>1.2</version>
+        <executions>
+          <execution>
+            <phase>process-test-classes</phase>
+            <goals>
+              <goal>execute</goal>
+            </goals>
+            <configuration>
+              <scripts>
+                <script><![CDATA[
+                def file = new File(project.properties.test_classpath_file)
+                project.properties.test_classpath = file.getText().split().join(":")
+                ]]></script>
+              </scripts>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
 
       <plugin>
         <groupId>net.alchim31.maven</groupId>
@@ -1317,7 +1364,11 @@
           <argLine>-Xmx3g -XX:MaxPermSize=${MaxPermGen} -XX:ReservedCodeCacheSize=512m</argLine>
           <systemProperties>
             <java.awt.headless>true</java.awt.headless>
+            <!--
             <spark.test.home>${session.executionRootDirectory}</spark.test.home>
+            -->
+            <spark.hbase.test.home>${basedir}</spark.hbase.test.home>
+
             <spark.testing>1</spark.testing>
             <spark.ui.enabled>false</spark.ui.enabled>
             <spark.ui.showConsoleProgress>false</spark.ui.showConsoleProgress>
@@ -1348,7 +1399,11 @@
           </environmentVariables>
           <systemProperties>
             <java.awt.headless>true</java.awt.headless>
+            <!--
             <spark.test.home>${spark.test.home}</spark.test.home>
+            -->
+            <spark.hbase.test.home>${basedir}</spark.hbase.test.home>
+
             <spark.testing>1</spark.testing>
             <spark.ui.enabled>false</spark.ui.enabled>
             <spark.ui.showConsoleProgress>false</spark.ui.showConsoleProgress>
