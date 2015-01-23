@@ -52,8 +52,6 @@
     <log4j.version>1.2.17</log4j.version>
     <protobuf.version>2.5.0</protobuf.version>
     <yarn.version>${hadoop.version}</yarn.version>
-    <!-- <hbase.artifact>hbase</hbase.artifact> -->
-    <!-- <flume.version>1.4.0</flume.version> -->
     <zookeeper.version>3.4.5</zookeeper.version>
     <parquet.version>1.6.0rc3</parquet.version>
     <jblas.version>1.2.3</jblas.version>
@@ -83,10 +81,8 @@
       during compilation if the dependency is transitive (e.g. "bagel/" depending on "core/" and
       needing Hadoop classes in the classpath to compile).
     -->
-    <!-- <flume.deps.scope>compile</flume.deps.scope> -->
     <hadoop.deps.scope>compile</hadoop.deps.scope>
     <hbase.deps.scope>compile</hbase.deps.scope>
-    <!-- <hive.deps.scope>compile</hive.deps.scope> -->
     <parquet.deps.scope>compile</parquet.deps.scope>
 
     <!--
@@ -541,10 +537,10 @@
     </dependency>
 
     <!--
-  This dependency has been added to provided scope as it is needed for executing build
-  specific groovy scripts using gmaven+ and not required for downstream project building
-  with spark.
--->
+    This dependency has been added to provided scope as it is needed for executing build
+    specific groovy scripts using gmaven+ and not required for downstream project building
+    with spark.
+    -->
     <dependency>
       <groupId>org.codehaus.groovy</groupId>
       <artifactId>groovy-all</artifactId>
@@ -553,7 +549,7 @@
     </dependency>
   </dependencies>
 
-  <!-- TODO do away with hbase profile.  Later, we need to create profiles for HBase versions -->
+  <!-- TODO Replace this profile with HBase version profiles. -->
   <profiles>
     <profile>
       <id>hbase</id>
