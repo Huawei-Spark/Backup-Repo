@@ -17,9 +17,6 @@
   -->
 
 <!-- BUILD:   mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests  clean package install -->
-<!-- BUILD:   mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests  clean package install -->
-<!-- BUILD:   mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests  clean package install -->
-<!-- BUILD:   mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests  clean package install -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -58,14 +55,6 @@
     <!-- <hbase.artifact>hbase</hbase.artifact> -->
     <!-- <flume.version>1.4.0</flume.version> -->
     <zookeeper.version>3.4.5</zookeeper.version>
-
-    <!-- <hive.group>org.spark-project.hive</hive.group> -->
-    <!-- Version used in Maven Hive dependency -->
-    <!-- <hive.version>0.13.1a</hive.version> -->
-    <!-- Version used for internal directory structure -->
-    <!-- <hive.version.short>0.13.1</hive.version.short> -->
-    <!-- <derby.version>10.10.1.1</derby.version> -->
-
     <parquet.version>1.6.0rc3</parquet.version>
     <jblas.version>1.2.3</jblas.version>
     <jetty.version>8.1.14.v20131031</jetty.version>
@@ -91,7 +80,7 @@
       declared in the projects that build assemblies.
 
       For other projects the scope should remain as "compile", otherwise they are not available
-      during compilation if the dependency is transivite (e.g. "bagel/" depending on "core/" and
+      during compilation if the dependency is transitive (e.g. "bagel/" depending on "core/" and
       needing Hadoop classes in the classpath to compile).
     -->
     <!-- <flume.deps.scope>compile</flume.deps.scope> -->
@@ -515,14 +504,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- SBT/IVY will fail to resolve dependencies defined in pom-only module 'hbase-testing-util'.  Must define its deps in this pom instead. -->
-    <!--
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-testing-util</artifactId>
-      <version>${hbase.version}</version>
-    </dependency>
-    -->
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-mapper-asl</artifactId>
@@ -559,6 +540,7 @@
     </dependency>
   </dependencies>
 
+  <!-- TODO do away with hbase profile.  Later, we need to create profiles for HBase versions -->
   <profiles>
     <profile>
       <id>hbase</id>
@@ -1197,39 +1179,6 @@
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
-      <!-- 
-	Avoid infinite loop in maven build due to explicit dependency on hbase-server-tests module:
-	"Dependency-reduced POM written at: spark/sql/hbase/dependency-reduced-pom.xml"
-      -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.3</version>
-        <configuration>
-          <createDependencyReducedPom>false</createDependencyReducedPom>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!--
-      <plugin>
-        <groupId>org.scalatest</groupId>
-        <artifactId>scalatest-maven-plugin</artifactId>
-	<version>1.0</version>
-        <configuration>
-          INNER COMMENT:  Specially disable assertions since some Hive tests fail them 
-          <argLine>-da -Xmx3g -XX:MaxPermSize=${MaxPermGen} -XX:ReservedCodeCacheSize=512m</argLine>
-        </configuration>	
-      </plugin>
-      -->
-
       <!-- Deploy datanucleus jars to the spark/lib_managed/jars directory -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -1238,6 +1187,7 @@
         <executions>
           <execution>
             <goals>
+              <goal>jar</goal>
               <goal>test-jar</goal>
             </goals>
           </execution>
@@ -1414,14 +1364,6 @@
           </execution>
         </executions>
       </plugin>
-
-      <!--
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.4</version>
-      </plugin>
--->
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
