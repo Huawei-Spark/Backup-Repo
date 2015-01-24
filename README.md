@@ -38,9 +38,9 @@ Run all test suites from Maven:
 
     mvn -Phbase,hadoop-2.4 test
 
-Run a single test suite from Maven:
+Run a single test suite from Maven, for example:
 
-    mvn -Phbase,hadoop-2.4 test -DwildcardSuites=org.apache.spark.sql.hbase.BasicQueriesTest 
+    mvn -Phbase,hadoop-2.4 test -DwildcardSuites=org.apache.spark.sql.hbase.BasicQueriesSuite
 
 ## Configuration
 
