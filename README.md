@@ -15,9 +15,9 @@ Online documentation can be found on [Spark JIRA page](https://issues.apache.org
 ## Building Spark HBase
 
 Spark HBase is built using [Apache Maven](http://maven.apache.org/).
-To build Spark and its example programs, run:
+To build Spark HBase, run:
 
-    mvn -DskipTests clean package
+    mvn -T1C -Phbase,hadoop-2.4 -DskipTests  clean package
 
 
 ## Interactive Scala Shell
@@ -33,6 +33,14 @@ Testing first requires [building Spark HBase](#building-spark). Once Spark HBase
 can be run using:
 
     ./dev/run-tests
+
+Run all test suites from Maven:
+
+    mvn -Phbase,hadoop-2.4 test
+
+Run a single test suite from Maven:
+
+    mvn -Phbase,hadoop-2.4 test -DwildcardSuites=org.apache.spark.sql.hbase.BasicQueriesTest 
 
 ## Configuration
 
