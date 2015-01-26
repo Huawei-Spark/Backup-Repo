@@ -26,7 +26,11 @@ set -o posix
 CLASS="org.apache.spark.sql.hbase.HBaseSQLCliDriver"
 
 # Figure out where Spark is installed
-FWDIR="$(cd "`dirname "$0"`"/..; pwd)"
+FWDIR=$SPARK_HOME
+if [ -z "$FWDIR" ]
+then
+echo "\$SPARK_HOME is not set"
+fi
 
 function usage {
   echo "Usage: ./bin/hbase-sql [options] [cli option]"
