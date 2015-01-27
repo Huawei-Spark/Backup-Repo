@@ -55,8 +55,7 @@ To import the current Spark HBase project for IntelliJ:
 5. Leave other settings at their default and you should be able to start your development.
 6. When you run the scala test, sometimes you will get out of memory exception. You can increase your VM memory usage by the following setting, for example:
 
-
-    -XX:MaxPermSize=512m -Xmx3072m
+     -XX:MaxPermSize=512m -Xmx3072m
 
 You can also make those setting to be the default by setting to the "Defaults -> ScalaTest".
 
