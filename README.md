@@ -42,6 +42,22 @@ Run a single test suite from Maven, for example:
 
     mvn -Phbase,hadoop-2.4 test -DwildcardSuites=org.apache.spark.sql.hbase.BasicQueriesSuite
 
+## IDE Setup
+
+We use IntelliJ IDEA for Spark HBase development. You can get the community edition for free and install the JetBrains Scala plugin from Preferences > Plugins.
+
+To import the current Spark HBase project for IntelliJ:
+
+1. Download IntelliJ and install the Scala plug-in for IntelliJ. You may also need to install Maven plug-in for IntelliJ.
+2. Go to "File->Import Project", locate the Spark HBase source directory, and select "Maven Project".
+3. In the Import Wizard, select "Import Maven projects automatically" and leave other settings at their default. 
+4. Make sure some specific profiles are enabled. Select corresponding Hadoop version, "maven3" and also"hbase" in order to get dependencies.5. Leave other settings at their default and you should be able to start your development.
+6. When you run the scala test, sometimes you will get out of memory exception. You can increase your VM memory usage by the following setting, for example:
+
+    -XX:MaxPermSize=512m -Xmx3072m
+
+You can also make those setting to be the default by setting to the "Defaults->ScalaTest".
+
 ## Configuration
 
 Please refer to the [Configuration guide](http://spark.apache.org/docs/latest/configuration.html)
