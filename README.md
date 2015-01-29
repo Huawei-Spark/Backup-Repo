@@ -15,9 +15,67 @@ Online documentation can be found on [Spark JIRA page](https://issues.apache.org
 ## Building Spark HBase
 
 Spark HBase is built using [Apache Maven](http://maven.apache.org/).
-To build Spark HBase, run:
 
-    mvn -T1C -Phbase,hadoop-2.4 -DskipTests  clean package
+The refactoring job of separating the spark hbase sub-project from the spark project is ongoing.
+Some manual steps are required to build the new stand-alone spark-hbase project until this task
+is complete.
+
+In an effort the avoid confusion over the terms spark, spark-hbase, and hbase, these two projects
+are referred to here as
+
+	"Spark-Huawei/spark":  https://github.com/Huawei-Spark/spark.git  (spark + all sub-modules)
+	"Spark-Huawei/hbase":  https://github.com/Huawei-Spark/hbase.git  (standalone spark-hbase project)
+
+In short, you will need to manually delete the spark/sql/hbase module from the Spark-Huawei/spark
+source tree, all references to it in the spark build infrastructure, build/install spark, then build
+the standalone Spark-Huawei/hbase project.
+
+
+Here is the step-by-step process:
+
+
+I	Clone, edit, build Spark-Huawei/spark
+
+	Define a SPARK_HOME environment variable on your development machine
+	and clone the project to that location.
+
+	$ git clone https://github.com/Huawei-Spark/spark.git
+
+	Change your current working dir to your SPARK_HOME and make sure you
+	downloaded branch 'hbase'.
+
+	$ git branch
+        output:  * hbase
+
+	Manually remove the sql/hbase module from the Spark-Huawei/spark project.
+
+	$ rm -rf $SPARK_HOME/sql/hbase
+
+	Edit the spark project's parent pom.xml -- delete the line '<module>sql/hbase</module>'
+	(from two locations).
+
+	Build and install Spark-Huawei/spark; it must be installed in your local maven repo.
+
+	$ mvn -e -T1C -Pyarn,hadoop-2.4,hive  -Dhadoop.version=2.4.0 -DskipTests  clean package install
+
+II	Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
+
+	Change your current working dir to ../$SPARK_HOME and clone the standalone spark-hbase project.
+
+	$ git clone https://github.com/Huawei-Spark/hbase.git
+
+	Make sure you downloaded branch 'master'.
+
+	$ git branch
+	output:  * master
+
+	You have installed spark in your local maven repo; now you can build Spark-Huawei/hbase against it.
+
+	$ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
+
+III 	Run Spark-Huawei/hbase test suites against an HBase minicluster, from Maven.
+
+	$ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0  test
 
 
 ## Interactive Scala Shell
