@@ -50,10 +50,10 @@ Here is the step-by-step process:
 ```
   Edit the spark project's parent pom.xml -- delete the line '<module>sql/hbase</module>' (from two locations).
 
-    Build and install Spark-Huawei/spark; it must be installed in your local maven repo.
-
+  Build and install Spark-Huawei/spark; it must be installed in your local maven repo.
+```
     $ mvn -e -T1C -Pyarn,hadoop-2.4,hive  -Dhadoop.version=2.4.0 -DskipTests  clean package install
-
+```
 2. Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
 
   Change your current working dir to ../$SPARK_HOME and clone the standalone spark-hbase project.
