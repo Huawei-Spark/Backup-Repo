@@ -71,9 +71,9 @@ You have installed spark in your local maven repo; now you can build Spark-Huawe
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
 
 3. Run Spark-Huawei/hbase test suites against an HBase minicluster, from Maven.
-
+```
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0  test
-
+```
 
 ## Interactive Scala Shell
 
