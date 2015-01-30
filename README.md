@@ -33,31 +33,30 @@ the standalone Spark-Huawei/hbase project.
 
 Here is the step-by-step process:
 
-
 1. Clone, edit, build Spark-Huawei/spark
 
-Define a SPARK_HOME environment variable on your development machine and clone the project to that location.
+    Define a SPARK_HOME environment variable on your development machine and clone the project to that location.
 
     $ git clone https://github.com/Huawei-Spark/spark.git
 
-Change your current working dir to your SPARK_HOME and make sure you downloaded branch 'hbase'.
+    Change your current working dir to your SPARK_HOME and make sure you downloaded branch 'hbase'.
 
     $ git branch
     output:  * hbase
 
-Manually remove the sql/hbase module from the Spark-Huawei/spark project.
+    Manually remove the sql/hbase module from the Spark-Huawei/spark project.
 
     $ rm -rf $SPARK_HOME/sql/hbase
 
-Edit the spark project's parent pom.xml -- delete the line '<module>sql/hbase</module>' (from two locations).
+    Edit the spark project's parent pom.xml -- delete the line '<module>sql/hbase</module>' (from two locations).
 
-Build and install Spark-Huawei/spark; it must be installed in your local maven repo.
+    Build and install Spark-Huawei/spark; it must be installed in your local maven repo.
 
     $ mvn -e -T1C -Pyarn,hadoop-2.4,hive  -Dhadoop.version=2.4.0 -DskipTests  clean package install
 
 2. Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
 
-Change your current working dir to ../$SPARK_HOME and clone the standalone spark-hbase project.
+    Change your current working dir to ../$SPARK_HOME and clone the standalone spark-hbase project.
 
     $ git clone https://github.com/Huawei-Spark/hbase.git
 
@@ -66,7 +65,7 @@ Change your current working dir to ../$SPARK_HOME and clone the standalone spark
     $ git branch
     output:  * master
 
-You have installed spark in your local maven repo; now you can build Spark-Huawei/hbase against it.
+    You have installed spark in your local maven repo; now you can build Spark-Huawei/hbase against it.
 
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
 
