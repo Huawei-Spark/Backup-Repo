@@ -33,7 +33,7 @@ the standalone Spark-Huawei/hbase project.
 
 Here is the step-by-step process:
 
-1. Clone, edit, build Spark-Huawei/spark
+I. Clone, edit, build Spark-Huawei/spark
 
   Define a SPARK_HOME environment variable on your development machine and clone the project to that location.
 ```
@@ -54,7 +54,7 @@ Here is the step-by-step process:
 ```
     $ mvn -e -T1C -Pyarn,hadoop-2.4,hive  -Dhadoop.version=2.4.0 -DskipTests  clean package install
 ```
-2. Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
+II. Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
 
   Change your current working dir to ../$SPARK_HOME and clone the standalone spark-hbase project.
 ```
@@ -69,7 +69,7 @@ Here is the step-by-step process:
 ```
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
 ```
-3. Run Spark-Huawei/hbase test suites against an HBase minicluster, from Maven.
+III. Run Spark-Huawei/hbase test suites against an HBase minicluster, from Maven.
 ```
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0  test
 ```
