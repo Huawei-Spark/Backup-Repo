@@ -645,9 +645,9 @@ class HBaseSQLQuerySuite extends HBaseIntegrationTestBase {
 
     val schema2 = StructType(
       StructField("f1", StructType(
-        StructField("f11", IntegerType, false) ::
-        StructField("f12", BooleanType, false) :: Nil), false) ::
-      StructField("f2", MapType(StringType, IntegerType, true), false) :: Nil)
+        StructField("f11", IntegerType, nullable = false) ::
+          StructField("f12", BooleanType, nullable = false) :: Nil), nullable = false) ::
+        StructField("f2", MapType(StringType, IntegerType, valueContainsNull = true), nullable = false) :: Nil)
 
     val rowRDD2 = unparsedStrings.map { r =>
       val values = r.split(",").map(_.trim)

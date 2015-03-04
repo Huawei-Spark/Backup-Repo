@@ -44,8 +44,8 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 class HBaseSource extends RelationProvider {
   // Returns a new HBase relation with the given parameters
   override def createRelation(
-       sqlContext: SQLContext,
-       parameters: Map[String, String]): BaseRelation = {
+                               sqlContext: SQLContext,
+                               parameters: Map[String, String]): BaseRelation = {
     val catalog = sqlContext.catalog.asInstanceOf[HBaseCatalog]
 
     val tableName = parameters("tableName")
@@ -90,13 +90,13 @@ class HBaseSource extends RelationProvider {
  * @param allColumns schema
  * @param context HBaseSQLContext
  */
-@SerialVersionUID(1529873946227428789L)
+@SerialVersionUID(15298736227428789L)
 private[hbase] case class HBaseRelation(
      tableName: String,
      hbaseNamespace: String,
      hbaseTableName: String,
      allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
-  extends CatalystScan with InsertableRelation with Serializable {
+  extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -172,6 +172,12 @@ private[hbase] case class HBaseRelation(
   // find the index in a sequence of AttributeReferences that is a key; -1 if not present
   def rowIndex(refs: Seq[Attribute], keyIndex: Int): Int = {
     refs.indexWhere(_.exprId == partitionKeys(keyIndex).exprId)
+  }
+
+  def flushHTable() = {
+    if (htable_ != null) {
+      htable_.flushCommits()
+    }
   }
 
   def closeHTable() = {
@@ -279,8 +285,8 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildFilter(
-       projList: Seq[NamedExpression],
-       pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
+                   projList: Seq[NamedExpression],
+                   pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
     var distinctProjList = projList.distinct
     if (pred.isDefined) {
       distinctProjList = distinctProjList.filterNot(_.references.subsetOf(pred.get.references))
@@ -678,16 +684,89 @@ private[hbase] case class HBaseRelation(
   }
 
   /**
+   * Convert the row key to its proper format. Due to the nature of HBase, the start and
+   * end of partition could be partial row key, we may need to append 0x00 to make it comply
+   * with the definition of key columns, for example, add four 0x00 if a key column type is
+   * integer. Also string type will always be even number, so we need to add one 0x00 or two
+   * depends on the length of the byte.
+   * @param rawKey the original row key
+   * @return the proper row key based on the definition of the key columns
+   */
+  def getFinalKey(rawKey: Option[HBaseRawType]): HBaseRawType = {
+    val origRowKey: HBaseRawType = rawKey.get
+
+    /**
+     * Recursively run this function to check the key columns one by one.
+     * If the input raw key contains the whole part of this key columns, then continue to
+     * check the next one; otherwise, append the raw key by adding 0x00 to its proper format
+     * and return it.
+     * @param rowIndex the start point of unchecked bytes in the input raw key
+     * @param curKeyIndex the next key column need to be checked
+     * @return the proper row key based on the definition of the key columns
+     */
+    def getFinalRowKey(rowIndex: Int, curKeyIndex: Int): HBaseRawType = {
+      if (curKeyIndex >= keyColumns.length) origRowKey
+      else {
+        val typeOfKey = keyColumns(curKeyIndex)
+        if (typeOfKey.dataType == StringType) {
+          val indexOfStringEnd = origRowKey.indexOf(0x00, rowIndex)
+          if (indexOfStringEnd == -1) {
+            val delta: Array[Byte] = if ((origRowKey.length - rowIndex) % 2 == 0) {
+              new Array[Byte](1 + getMinimum(curKeyIndex + 1))
+            } else {
+              new Array[Byte](2 + getMinimum(curKeyIndex + 1))
+            }
+            origRowKey ++ delta
+          } else {
+            getFinalRowKey(indexOfStringEnd + 1, curKeyIndex + 1)
+          }
+        } else {
+          val nextRowIndex = rowIndex +
+            typeOfKey.dataType.asInstanceOf[NativeType].defaultSize
+          if (nextRowIndex <= origRowKey.length) {
+            getFinalRowKey(nextRowIndex, curKeyIndex + 1)
+          } else {
+            val delta: Array[Byte] = {
+              new Array[Byte](nextRowIndex - origRowKey.length + getMinimum(curKeyIndex + 1))
+            }
+            origRowKey ++ delta
+          }
+        }
+      }
+    }
+
+    /**
+     * Get the minimum key length based on the key columns definition
+     * @param startKeyIndex the start point of the key column
+     * @return the minimum length required for the remaining key columns
+     */
+    def getMinimum(startKeyIndex: Int): Int = {
+      keyColumns.drop(startKeyIndex).map(k => {
+        k.dataType match {
+          case StringType => 1
+          case _ => k.dataType.asInstanceOf[NativeType].defaultSize
+        }
+      }
+      ).sum
+    }
+
+    getFinalRowKey(0, 0)
+  }
+
+  /**
    * Convert a HBase row key into column values in their native data formats
    * @param rawKey the HBase row key
    * @return A sequence of column values from the row Key
    */
-  def nativeKeysConvert(rawKey: Option[HBaseRawType]): Seq[Any] = {
+  def nativeKeyConvert(rawKey: Option[HBaseRawType]): Seq[Any] = {
     if (rawKey.isEmpty) Nil
     else {
-      HBaseKVHelper.decodingRawKeyColumns(rawKey.get, keyColumns).
-        zipWithIndex.map(pi => DataTypeUtils.bytesToData(rawKey.get,
+      val finalRowKey = getFinalKey(rawKey)
+
+      HBaseKVHelper.decodingRawKeyColumns(finalRowKey, keyColumns).
+        zipWithIndex.map(pi => DataTypeUtils.bytesToData(finalRowKey,
         pi._1._1, pi._1._2, keyColumns(pi._2).dataType))
     }
   }
 }
+
