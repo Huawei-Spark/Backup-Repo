@@ -79,10 +79,31 @@ object DataTypeUtils {
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
+  
+  def string2TypeData(v: String, dt: DataType): Any = {
+    v match {
+      case null => null
+      case _ => 
+        dt match {
+          // TODO: handle some complex types
+          case BooleanType => v.toBoolean
+          case ByteType => v.getBytes()(0)
+          case DoubleType => v.toDouble
+          case FloatType => v.toFloat
+          case IntegerType => v.toInt
+          case LongType => v.toLong
+          case ShortType => v.toShort
+          case StringType => v
+        }
+      }
+  }
+
 
   def getRowColumnInHBaseRawType(row: Row,
                                    index: Int,
                                    dt: DataType): HBaseRawType = {
+    if(row.isNullAt(index)) return new Array[Byte](0)
+    
     val bu = BytesUtils.create(dt)
     dt match {
       case StringType => bu.toBytes(row.getString(index))

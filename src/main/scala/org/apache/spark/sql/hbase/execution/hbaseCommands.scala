@@ -36,7 +36,7 @@ import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.HBasePartitioner.HBaseRawOrdering
 import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.util.{HBaseKVHelper, Util}
+import org.apache.spark.sql.hbase.util.{HBaseKVHelper, Util, DataTypeUtils}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.{Logging, SerializableWritable, SparkEnv, TaskContext}
@@ -132,20 +132,14 @@ case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
     val relation: HBaseRelation = solvedRelation.asInstanceOf[Subquery]
       .child.asInstanceOf[LogicalRelation]
       .relation.asInstanceOf[HBaseRelation]
-    val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
-    val valueBytes = new Array[HBaseRawType](relation.nonKeyColumns.size)
-    val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
-    HBaseKVHelper.string2KV(valueSeq, relation, lineBuffer, keyBytes, valueBytes)
-    val rowKey = HBaseKVHelper.encodingRawKeyColumns(keyBytes)
-    val put = new Put(rowKey)
-    for (i <- 0 until valueBytes.length) {
-      val value = valueBytes(i)
-      if (value != null) {
-        val nkc = relation.nonKeyColumns(i)
-        put.add(nkc.familyRaw, nkc.qualifierRaw, value)
-      }
-    }
-    relation.htable.put(put)
+
+    val bytes = valueSeq.zipWithIndex.map(v =>
+      DataTypeUtils.string2TypeData(v._1, relation.schema(v._2).dataType))
+    
+    val rows = sqlContext.sparkContext.makeRDD(Seq(Row.fromSeq(bytes)))
+    val inputValuesDF = sqlContext.createDataFrame(rows, relation.schema)
+    relation.insert(inputValuesDF, false)
+    
     Seq.empty[Row]
   }
 

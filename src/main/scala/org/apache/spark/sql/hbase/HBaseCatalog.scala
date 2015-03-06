@@ -279,7 +279,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
    */
   override def getTables(databaseName: Option[String]): Seq[(String, Boolean)] = {
      var tables = getAllTableName
-     tables.map((_,true))
+     tables.map((_, false))
   }
 
   override def refreshTable(databaseName: String, tableName: String): Unit = {
