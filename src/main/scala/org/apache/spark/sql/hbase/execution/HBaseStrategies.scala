@@ -44,8 +44,6 @@ private[hbase] trait HBaseStrategies {
           inPredicates,
           (a, f) => relation.buildScan(a, f)) :: Nil
 
-      case InsertIntoTable(l@LogicalRelation(t: HBaseRelation), partition, child, _) =>
-        execution.InsertIntoHBaseTable(t, planLater(child)) :: Nil
       case _ => Nil
     }
 
