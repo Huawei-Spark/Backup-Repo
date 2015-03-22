@@ -23,7 +23,7 @@ import java.util.Date
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.util._
-import org.apache.spark.sql.{Row, SchemaRDD}
+import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
 abstract class HBaseIntegrationTestBase
@@ -34,10 +34,10 @@ abstract class HBaseIntegrationTestBase
 
   /**
    * Runs the plan and makes sure the answer matches the expected result.
-   * @param rdd the [[SchemaRDD]] to be executed
+   * @param rdd the [[DataFrame]] to be executed
    * @param expectedAnswer the expected result, can either be an Any, Seq[Product], or Seq[ Seq[Any] ].
    */
-  protected def checkAnswer(rdd: SchemaRDD, expectedAnswer: Seq[Row]): Unit = {
+  protected def checkAnswer(rdd: DataFrame, expectedAnswer: Seq[Row]): Unit = {
     val isSorted = rdd.logicalPlan.collect { case s: logical.Sort => s}.nonEmpty
     def prepareAnswer(answer: Seq[Row]): Seq[Row] = {
       // Converts data to types that we can do equality comparison using Scala collections.
@@ -83,7 +83,7 @@ abstract class HBaseIntegrationTestBase
     }
   }
 
-  protected def checkAnswer(rdd: SchemaRDD, expectedAnswer: Row): Unit = {
+  protected def checkAnswer(rdd: DataFrame, expectedAnswer: Row): Unit = {
     checkAnswer(rdd, Seq(expectedAnswer))
   }
 

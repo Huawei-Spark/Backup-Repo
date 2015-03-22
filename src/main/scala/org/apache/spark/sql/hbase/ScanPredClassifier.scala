@@ -18,12 +18,13 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils}
 
 /**
  * Classifies a predicate into a pair of (pushdownable, non-pushdownable) predicates
  * for a Scan; the logic relationship between the two components of the pair is AND
  */
-class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
+class ScanPredClassifier(relation: HBaseRelation) {
   def apply(pred: Expression): (Option[Expression], Option[Expression]) = {
     // post-order bottom-up traversal
     pred match {
@@ -88,6 +89,32 @@ class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
       case LessThanOrEqual(left, right) => classifyBinary(left, right, pred)
       case GreaterThan(left, right) => classifyBinary(left, right, pred)
       case GreaterThanOrEqual(left, right) => classifyBinary(left, right, pred)
+      case In(value@AttributeReference(_, _, _, _), list) =>
+        if (relation.isNonKey(value) && list.filter(!_.isInstanceOf[Literal]).isEmpty) {
+          (Some(pred), None)
+        } else {
+          (None, Some(pred))
+        }
+      case InSet(value@AttributeReference(name, dataType, _, _), hset)
+        if relation.nonKeyColumns.exists(_.sqlName == name) =>
+        var errorOccurred = false
+        for (item <- hset if !errorOccurred) {
+          try {
+            /**
+             * Use try-catch to make sure data type conversion is proper, for example,
+             * Java throws casting exception while doing col2 in (1, 2, 3), if col2 data type
+             * if ByteType and 1, 2, 3 is Integer.
+              */
+            DataTypeUtils.getBinaryComparator(BytesUtils.create(dataType), Literal(item, dataType))
+          } catch {
+            case e: Exception => errorOccurred = true
+          }
+        }
+        if (errorOccurred) {
+          (None, Some(pred))
+        } else {
+          (Some(pred), None)
+        }
       // everything else are treated as non pushdownable
       case _ => (None, Some(pred))
     }
@@ -101,23 +128,13 @@ class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
         if (relation.isNonKey(right.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
-          val keyIdx = relation.keyIndex(right.asInstanceOf[AttributeReference])
-          if (keyIdx == keyIndex) {
-            (Some(pred), None)
-          } else {
-            (None, Some(pred))
-          }
+          (None, Some(pred))
         }
       case (AttributeReference(_, _, _, _), Literal(_, _)) =>
         if (relation.isNonKey(left.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
-          val keyIdx = relation.keyIndex(left.asInstanceOf[AttributeReference])
-          if (keyIdx == keyIndex) {
-            (Some(pred), None)
-          } else {
-            (None, Some(pred))
-          }
+          (None, Some(pred))
         }
       case _ => (None, Some(pred))
     }

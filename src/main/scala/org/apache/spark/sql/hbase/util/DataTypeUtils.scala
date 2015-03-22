@@ -25,7 +25,14 @@ import org.apache.spark.sql.hbase._
  * Data Type conversion utilities
  */
 object DataTypeUtils {
-  //  TODO: more data types support?
+  /**
+   * convert the byte array to data
+   * @param src the input byte array
+   * @param offset the offset in the byte array
+   * @param length the length of the data, only used by StringType
+   * @param dt the data type
+   * @return the actual data converted from byte array
+   */
   def bytesToData(src: HBaseRawType, offset: Int, length: Int, dt: DataType): Any = {
     dt match {
       case StringType => BytesUtils.toString(src, offset, length)
@@ -40,6 +47,12 @@ object DataTypeUtils {
     }
   }
 
+  /**
+   * convert data to byte array
+   * @param src the input data
+   * @param dt the data type
+   * @return the output byte array
+   */
   def dataToBytes(src: Any,
                   dt: DataType): HBaseRawType = {
     // TODO: avoid new instance per invocation
@@ -57,6 +70,15 @@ object DataTypeUtils {
     }
   }
 
+  /**
+   * set the row data from byte array
+   * @param row the row to be set
+   * @param index the index in the row
+   * @param src the input byte array
+   * @param offset the offset in the byte array
+   * @param length the length of the data, only used by StringType
+   * @param dt the data type
+   */
   def setRowColumnFromHBaseRawType(row: MutableRow,
                                    index: Int,
                                    src: HBaseRawType,
@@ -69,7 +91,7 @@ object DataTypeUtils {
     }
     dt match {
       case StringType => row.setString(index, BytesUtils.toString(src, offset, length))
-      case IntegerType => row.setInt(index, BytesUtils.toInt(src, offset)) 
+      case IntegerType => row.setInt(index, BytesUtils.toInt(src, offset))
       case BooleanType => row.setBoolean(index, BytesUtils.toBoolean(src, offset))
       case ByteType => row.setByte(index, BytesUtils.toByte(src, offset))
       case DoubleType => row.setDouble(index, BytesUtils.toDouble(src, offset))
@@ -79,11 +101,11 @@ object DataTypeUtils {
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
-  
+
   def string2TypeData(v: String, dt: DataType): Any = {
     v match {
       case null => null
-      case _ => 
+      case _ =>
         dt match {
           // TODO: handle some complex types
           case BooleanType => v.toBoolean
@@ -95,15 +117,19 @@ object DataTypeUtils {
           case ShortType => v.toShort
           case StringType => v
         }
-      }
+    }
   }
 
+  /**
+   * get the data from row based on index
+   * @param row the input row
+   * @param index the index of the data
+   * @param dt the data type
+   * @return the data from the row based on index
+   */
+  def getRowColumnInHBaseRawType(row: Row, index: Int, dt: DataType): HBaseRawType = {
+    if (row.isNullAt(index)) return new Array[Byte](0)
 
-  def getRowColumnInHBaseRawType(row: Row,
-                                   index: Int,
-                                   dt: DataType): HBaseRawType = {
-    if(row.isNullAt(index)) return new Array[Byte](0)
-    
     val bu = BytesUtils.create(dt)
     dt match {
       case StringType => bu.toBytes(row.getString(index))
@@ -118,8 +144,15 @@ object DataTypeUtils {
     }
   }
 
-  def getComparator(bu: BytesUtils, expression: Literal): BinaryComparator = {
+  /**
+   * create binary comparator for the input expression
+   * @param bu the byte utility
+   * @param expression the input expression
+   * @return the constructed binary comparator
+   */
+  def getBinaryComparator(bu: BytesUtils, expression: Literal): BinaryComparator = {
     expression.dataType match {
+      case ByteType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Byte]))
       case DoubleType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Double]))
       case FloatType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Float]))
       case IntegerType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Int]))

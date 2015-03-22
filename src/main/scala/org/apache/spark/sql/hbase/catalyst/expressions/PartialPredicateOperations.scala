@@ -101,13 +101,27 @@ object PartialPredicateOperations {
             })
             (null, In(expr, evaluatedList))
           } else {
-            val evaluatedList = list.map(_.partialReduce(input, schema))
-            if (evaluatedList.exists(e => e._1 == evaluatedValue)) {
+            val evaluatedList: Seq[(Any, Expression)] = list.map(_.partialReduce(input, schema))
+            var foundInList = false
+            var newList = List[Expression]()
+            for (item <- evaluatedList if !foundInList) {
+              if (item._1 == null) {
+                newList = newList :+ item._2
+              } else if (item._2 == null) {
+                val cmp = prc2(input, value.dataType, item._2.dataType, evaluatedValue, item._1)
+                if (cmp.isDefined && cmp.get == 0) {
+                  foundInList = true
+                } else if (cmp.isEmpty || (cmp.isDefined && (cmp.get == 1 || cmp.get == -1))) {
+                  newList = newList :+ item._2
+                }
+              }
+            }
+            if (foundInList) {
               (true, null)
+            } else if (newList.size == 0) {
+              (false, null)
             } else {
-              val newList = evaluatedList.filter(p=>p._1 != null && p._1 != evaluatedValue)
-              if (newList.isEmpty) (false, null)
-              else (null, In(Literal(evaluatedValue, value.dataType), newList.map(_._2)))
+              (null, In(expr, newList))
             }
           }
         case InSet(value, hset) =>
@@ -115,7 +129,23 @@ object PartialPredicateOperations {
           if (evaluatedValue._1 == null) {
             (null, InSet(evaluatedValue._2, hset))
           } else {
-            (hset.contains(evaluatedValue._1), null)
+            var foundInSet = false
+            var newHset = Set[Any]()
+            for (item <- hset if !foundInSet) {
+              val cmp = prc2(input, value.dataType, value.dataType, evaluatedValue._1, item)
+              if (cmp.isDefined && cmp.get == 0) {
+                  foundInSet = true
+              } else if (cmp.isEmpty || (cmp.isDefined && (cmp.get == 1 || cmp.get == -1))) {
+                newHset = newHset + item
+              }
+            }
+            if (foundInSet) {
+              (true, null)
+            } else if (newHset.size == 0) {
+              (false, null)
+            } else {
+              (null, InSet(evaluatedValue._2, newHset))
+            }
           }
         case l: LeafExpression =>
           val res = l.eval(input)
@@ -142,7 +172,7 @@ object PartialPredicateOperations {
             (null, EqualTo(left, evalR._2))
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
-            if (cmp.isDefined &&  cmp.get != 1 && cmp.get != -1) {
+            if (cmp.isDefined && cmp.get != 1 && cmp.get != -1) {
               (cmp.get == 0, null)
             } else {
               (null, EqualTo(evalL._2, evalR._2))

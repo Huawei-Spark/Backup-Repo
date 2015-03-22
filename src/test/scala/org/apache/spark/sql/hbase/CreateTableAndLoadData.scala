@@ -36,12 +36,6 @@ trait CreateTableAndLoadData extends Logging {
   val CsvPaths = Array("src/test/resources", "sql/hbase/src/test/resources")
   val DefaultLoadFile = "testTable.txt"
 
-  var AvoidRowkeyBug = false
-
-  var AvoidIfNotExistsBug = true
-
-  val ifNotExists = if (!AvoidIfNotExistsBug) "IF NOT EXISTS" else ""
-
   private val tpath = for (csvPath <- CsvPaths
                            if new java.io.File(csvPath).exists()
   ) yield {
@@ -123,7 +117,7 @@ trait CreateTableAndLoadData extends Logging {
     }
 
     val (stagingSql, tabSql) =
-      ( s"""CREATE TABLE $ifNotExists $stagingTableName(strcol STRING, bytecol String, shortcol String, intcol String,
+      ( s"""CREATE TABLE $stagingTableName(strcol STRING, bytecol String, shortcol String, intcol String,
             longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))
             MAPPED BY ($hbaseStagingTable, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""

@@ -138,7 +138,7 @@ case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
     
     val rows = sqlContext.sparkContext.makeRDD(Seq(Row.fromSeq(bytes)))
     val inputValuesDF = sqlContext.createDataFrame(rows, relation.schema)
-    relation.insert(inputValuesDF, false)
+    relation.insert(inputValuesDF, overwrite = false)
     
     Seq.empty[Row]
   }
@@ -205,8 +205,8 @@ case class BulkLoadIntoTableCommand(
       (context: TaskContext, iter: Iterator[(HBaseRawType, Array[HBaseRawType])]) => {
         val config = wrappedConf.value
         /* "reduce task" <split #> <attempt # = spark task #> */
-        val attemptId = newTaskAttemptID(jobtrackerID, stageId, isMap = false, context.partitionId,
-          context.attemptNumber)
+        val attemptId = newTaskAttemptID(jobtrackerID, stageId, isMap = false,
+          context.partitionId(), context.attemptNumber())
         val hadoopContext = newTaskAttemptContext(config, attemptId)
         val format = new HFileOutputFormat2
         format match {
@@ -234,8 +234,8 @@ case class BulkLoadIntoTableCommand(
             }
 
             for (i <- 0 until kv._2.size) {
-              val nkc = relation.nonKeyColumns(i)
-              if (kv._2(i) != null) {
+              if (kv._2(i).nonEmpty) {
+                val nkc = relation.nonKeyColumns(i)
                 bytesWritable.set(kv._1)
                 writer.write(bytesWritable, new KeyValue(kv._1, nkc.familyRaw,
                   nkc.qualifierRaw, kv._2(i)))

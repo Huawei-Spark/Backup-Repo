@@ -63,7 +63,7 @@ object BytesUtils {
   }
 
   def toFloat(input: HBaseRawType, offset: Int): Float = {
-    var i = toInt(input, offset)
+    var i = Bytes.toInt(input, offset)
     i = i - 1
     i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
     java.lang.Float.intBitsToFloat(i)
@@ -85,6 +85,50 @@ object BytesUtils {
       v = (v << 8) + (input(i + offset) & 0xff)
     }
     v
+  }
+
+  /**
+   * add one to the unsigned byte array
+   * @param input the unsigned byte array
+   * @return null if the byte array is all 0xff, otherwise increase by 1
+   */
+  def addOne(input: HBaseRawType): HBaseRawType = {
+    val len = input.length
+    val result = new HBaseRawType(len)
+    Array.copy(input, 0, result, 0, len)
+    var setValue = false
+    for (index <- len - 1 to 0 by -1 if !setValue) {
+      val item: Byte = input(index)
+      if (item != 0xff.toByte) {
+        setValue = true
+        if ((item & 0x01.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x01.toByte).toByte
+        } else if ((item & 0x02.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x03.toByte).toByte
+        } else if ((item & 0x04.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x07.toByte).toByte
+        } else if ((item & 0x08.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x0f.toByte).toByte
+        } else if ((item & 0x10.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x1f.toByte).toByte
+        } else if ((item & 0x20.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x3f.toByte).toByte
+        } else if ((item & 0x40.toByte) == 0.toByte) {
+          result(index) = (item ^ 0x7f.toByte).toByte
+        } else {
+          result(index) = (item ^ 0xff.toByte).toByte
+        }
+        // after increment, set remaining bytes to zero
+        for (rest <- index + 1 until len) {
+          result(rest) = 0x00.toByte
+        }
+      }
+    }
+    if (!setValue) {
+      null
+    } else {
+      result
+    }
   }
 }
 
@@ -127,7 +171,8 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
   def toBytes(input: Float): HBaseRawType = {
     var i: Int = java.lang.Float.floatToIntBits(input)
     i = (i ^ ((i >> Integer.SIZE - 1) | Integer.MIN_VALUE)) + 1
-    toBytes(i)
+    Bytes.putInt(buffer, 0, i)
+    buffer
   }
 
   def toBytes(input: Int): HBaseRawType = {

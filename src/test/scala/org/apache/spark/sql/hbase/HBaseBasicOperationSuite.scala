@@ -70,6 +70,19 @@ class HBaseBasicOperationSuite extends HBaseIntegrationTestBase {
     assert(sql( """SELECT * FROM ta""").count() == 14)
   }
 
+  test("Count(*/1) and Non-Key Column Query") {
+    assert(sql( """SELECT count(*) FROM ta""").collect()(0).get(0) == 14)
+    assert(sql( """SELECT count(*) FROM ta where col2 < 8""").collect()(0).get(0) == 7)
+    assert(sql( """SELECT count(*) FROM ta where col4 < 0""").collect()(0).get(0) == 7)
+    assert(sql( """SELECT count(1) FROM ta where col2 < 8""").collect()(0).get(0) == 7)
+    assert(sql( """SELECT count(1) FROM ta where col4 < 0""").collect()(0).get(0) == 7)
+  }
+
+  test("InSet Query") {
+    assert(sql( """SELECT count(*) FROM ta where col2 IN (1, 2, 3)""").collect()(0).get(0) == 3)
+    assert(sql( """SELECT count(*) FROM ta where col4 IN (1, 2, 3)""").collect()(0).get(0) == 1)
+  }
+
   test("Select test 1 (AND, OR)") {
     assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").count == 2)
     assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").count == 4)

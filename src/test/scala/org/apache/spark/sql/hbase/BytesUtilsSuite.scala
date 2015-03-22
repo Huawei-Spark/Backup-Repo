@@ -18,7 +18,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark.Logging
-import org.apache.spark.sql._
+import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.types.HBaseBytesType
 import org.apache.spark.sql.hbase.util.BytesUtils
@@ -89,5 +89,22 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
 
     assert(compare(BytesUtils.create(IntegerType).toBytes(128),
       BytesUtils.create(IntegerType).toBytes(-128)) > 0)
+  }
+
+  test("byte array plus one") {
+    var byteArray =  Array[Byte](0x01.toByte, 127.toByte)
+    assert(Bytes.compareTo(BytesUtils.addOne(byteArray),  Array[Byte](0x01.toByte, 0x80.toByte)) == 0)
+
+    byteArray =  Array[Byte](0xff.toByte, 0xff.toByte)
+    assert(BytesUtils.addOne(byteArray) == null)
+
+    byteArray =  Array[Byte](0x02.toByte, 0xff.toByte)
+    assert(Bytes.compareTo(BytesUtils.addOne(byteArray),  Array[Byte](0x03.toByte, 0x00.toByte)) == 0)
+  }
+
+  test("float comparison") {
+    val f1 = BytesUtils.create(FloatType).toBytes(-1.23f)
+    val f2 = BytesUtils.create(FloatType).toBytes(100f)
+    assert(Bytes.compareTo(f1, f2) < 0)
   }
 }

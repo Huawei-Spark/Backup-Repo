@@ -20,9 +20,9 @@ package org.apache.spark.sql.hbase.execution
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
-import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.{Project, SparkPlan}
-import org.apache.spark.sql.hbase.{HBaseRelation, execution}
+import org.apache.spark.sql.hbase.HBaseRelation
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.{SQLContext, Strategy}
 
@@ -91,7 +91,7 @@ private[hbase] trait HBaseStrategies {
         HBaseSQLTableScan(hbaseRelation, projectList.map(_.toAttribute),
           scanBuilder(requestedColumns, pushedFilters))
       } else {
-        val requestedColumns = (projectSet ++ filterSet).map(relation.attributeMap).toSeq
+        val requestedColumns = projectSet.map(relation.attributeMap).toSeq
         val scan = HBaseSQLTableScan(hbaseRelation, requestedColumns,
           scanBuilder(requestedColumns, pushedFilters))
         Project(projectList, scan)

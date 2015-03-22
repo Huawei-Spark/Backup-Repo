@@ -17,13 +17,14 @@
 
 package org.apache.spark.sql.hbase
 
+import java.io.File
+
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.hbase.util.BytesUtils
 import org.apache.spark.sql.types.IntegerType
-import java.io.File
 
 class BulkLoadIntoTableSuite extends QueriesSuiteBase {
   val sc: SparkContext = TestHbase.sparkContext
