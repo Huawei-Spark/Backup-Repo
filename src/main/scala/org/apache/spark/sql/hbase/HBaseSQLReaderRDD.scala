@@ -136,7 +136,6 @@ class HBaseSQLReaderRDD(
       val tail: (HBaseRawType, NativeType) = {
         (DataTypeUtils.dataToBytes(key.get, keyType), keyType)
       }
-
       HBaseKVHelper.encodingRawKeyColumns(head :+ tail)
     } else {
       HBaseKVHelper.encodingRawKeyColumns(head)
@@ -225,7 +224,7 @@ class HBaseSQLReaderRDD(
         val end = if (expandedCPRs(size).prefix.size > 0) {
           var finalKey: HBaseRawType = {
             val rowKey = constructRowKey(expandedCPRs(size), isStart = false)
-            if (endInclusive) {
+            if (endInclusive || expandedCPRs(size).lastRange.end.isEmpty) {
               val newKey = BytesUtils.addOne(rowKey)
               if (newKey == null) {
                 partition.end.get

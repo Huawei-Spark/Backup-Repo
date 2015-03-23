@@ -256,4 +256,10 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
     val rows = TestHbase.sql(sql).collect()
     assert(rows(0).get(0) == 83)
   }
+
+  test("Query 18") {
+    val sql = "select ss_item_sk, ss_ticket_number from store_sales where (ss_item_sk = 186 and ss_ticket_number > 0)"
+    val rows = TestHbase.sql(sql).collect()
+    assert(rows.size == 1)
+  }
 }
