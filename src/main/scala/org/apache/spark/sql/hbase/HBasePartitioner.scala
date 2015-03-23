@@ -37,8 +37,8 @@ class HBasePartitioner (var splitKeys: Array[HBaseRawType]) extends Partitioner 
 
   lazy private val len = splitKeys.length
 
-  // For presplit table splitKeys(0) = bytes[0], to remove it,
-  // otherwise partiton 0 always be empty and
+  // For pre-split table splitKeys(0) = bytes[0], to remove it,
+  // otherwise partition 0 always be empty and
   // we will miss the last region's date when bulk load
   lazy private val realSplitKeys = if (splitKeys.isEmpty) splitKeys else splitKeys.tail
 

@@ -128,10 +128,10 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
       // [( and )] mean the possibilities of the inclusive and exclusive condition
       val aRange = a.asInstanceOf[Range[T]]
       val aStartInclusive = aRange.startInclusive
-      val aEnd = aRange.end.getOrElse(null)
+      val aEnd = if (aRange.end.isEmpty) null else aRange.end.get
       val aEndInclusive = aRange.endInclusive
       val bRange = b.asInstanceOf[Range[T]]
-      val bStart = bRange.start.getOrElse(null)
+      val bStart = if (bRange.start.isEmpty) null else bRange.start.get
       val bStartInclusive = bRange.startInclusive
       val bEndInclusive = bRange.endInclusive
 

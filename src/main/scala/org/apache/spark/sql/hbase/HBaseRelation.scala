@@ -327,7 +327,7 @@ private[hbase] case class HBaseRelation(
         val keyCol = keyColumns.find(_.order == index).get
         val left = filterPred.get.references.find(_.name == keyCol.sqlName).get
         val startInclusive = cpr.lastRange.startInclusive
-        val endInclusinve = cpr.lastRange.endInclusive
+        val endInclusive = cpr.lastRange.endInclusive
         if (cpr.lastRange.isPoint) {
           val right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
           EqualTo(left, right)
@@ -339,7 +339,7 @@ private[hbase] case class HBaseRelation(
             GreaterThan(left, right)
           }
           right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
-          val rightExpress = if (endInclusinve) {
+          val rightExpress = if (endInclusive) {
             LessThanOrEqual(left, right)
           } else {
             LessThan(left, right)
@@ -354,7 +354,7 @@ private[hbase] case class HBaseRelation(
           }
         } else if (cpr.lastRange.end.isDefined) {
           val right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
-          if (endInclusinve) {
+          if (endInclusive) {
             LessThanOrEqual(left, right)
           } else {
             LessThan(left, right)
@@ -657,8 +657,8 @@ private[hbase] case class HBaseRelation(
     if (!overwrite) {
       sqlContext.sparkContext.runJob(data.rdd, writeToHBase _)
     } else {
-      // TODO: Support INSERT OVERWITE INTO
-      sys.error("HBASE Table doesnot support INSERT OVERWRITE for now.")
+      // TODO: Support INSERT OVERWRITE INTO
+      sys.error("HBASE Table does not support INSERT OVERWRITE for now.")
     }
   }
 
@@ -724,7 +724,7 @@ private[hbase] case class HBaseRelation(
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
                 filters: Option[FilterList], otherFilters: Option[Expression],
                 pushdownPreds: Seq[Expression],
-                projList: Seq[NamedExpression]): Scan = {
+                projectionList: Seq[NamedExpression]): Scan = {
     val scan = {
       (start, end) match {
         case (Some(lb), Some(ub)) => new Scan(lb, ub)
@@ -735,7 +735,7 @@ private[hbase] case class HBaseRelation(
     }
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projList)
+    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projectionList)
   }
 
   /**
@@ -751,14 +751,16 @@ private[hbase] case class HBaseRelation(
                               otherFilters: Option[Expression],
                               pushdownPreds: Seq[Expression],
                               projectionList: Seq[NamedExpression]): Scan = {
-    var distinctProjList = projectionList.map(_.name)
+    var distinctProjectionList = projectionList.map(_.name)
     if (otherFilters.isDefined) {
-      distinctProjList = distinctProjList.union(otherFilters.get.references.toSeq.map(_.name))
+      distinctProjectionList =
+        distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name))
     }
     // filter out the key columns
-    distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p))
+    distinctProjectionList =
+      distinctProjectionList.filterNot(p => keyColumns.exists(_.sqlName == p))
 
-    val finalFilters = if (distinctProjList.size == 0) {
+    val finalFilters = if (distinctProjectionList.size == 0) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
         if (filters.get.getFilters.size() == 1) {
           filters.get.getFilters.get(0)
@@ -789,13 +791,13 @@ private[hbase] case class HBaseRelation(
     if (pushdownPreds.nonEmpty) {
       val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).
         filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
-      if (distinctProjList.toSet.subsetOf(pushdownNameSet)) {
+      if (distinctProjectionList.toSet.subsetOf(pushdownNameSet)) {
         // If the pushed down predicate is present and the projection is a subset of the columns
         // of the pushed filters, use the columns as projections
         // to avoid a full projection
-        distinctProjList = pushdownNameSet.toSeq.distinct
-        if (distinctProjList.size > 0 && distinctProjList.size < nonKeyColumns.size) {
-          distinctProjList.map {
+        distinctProjectionList = pushdownNameSet.toSeq.distinct
+        if (distinctProjectionList.size > 0 && distinctProjectionList.size < nonKeyColumns.size) {
+          distinctProjectionList.map {
             case p =>
               val nkc = nonKeyColumns.find(_.sqlName == p).get
               scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
@@ -806,7 +808,7 @@ private[hbase] case class HBaseRelation(
     scan
   }
 
-  def buildGet(projList: Seq[NamedExpression], rowKey: HBaseRawType) {
+  def buildGet(projectionList: Seq[NamedExpression], rowKey: HBaseRawType) {
     new Get(rowKey)
     // TODO: add columns to the Get
   }

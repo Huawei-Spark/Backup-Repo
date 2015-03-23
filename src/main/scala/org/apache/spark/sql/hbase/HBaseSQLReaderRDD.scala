@@ -130,13 +130,17 @@ class HBaseSQLReaderRDD(
         (DataTypeUtils.dataToBytes(itemValue, itemType), itemType)
     }
 
-    val key = if (isStart) cpr.lastRange.start.get else cpr.lastRange.end.get
+    val key = if (isStart) cpr.lastRange.start else cpr.lastRange.end
     val keyType = cpr.lastRange.dt
-    val tail: (HBaseRawType, NativeType) = {
-      (DataTypeUtils.dataToBytes(key, keyType), keyType)
-    }
+    if (key.isDefined) {
+      val tail: (HBaseRawType, NativeType) = {
+        (DataTypeUtils.dataToBytes(key.get, keyType), keyType)
+      }
 
-    HBaseKVHelper.encodingRawKeyColumns(head :+ tail)
+      HBaseKVHelper.encodingRawKeyColumns(head :+ tail)
+    } else {
+      HBaseKVHelper.encodingRawKeyColumns(head)
+    }
   }
 
   // For critical-point-based predicate pushdown
@@ -169,9 +173,9 @@ class HBaseSQLReaderRDD(
         // all of the last ranges are point range, build a list of get
         val gets: java.util.List[Get] = new java.util.ArrayList[Get]()
 
-        val distinctProjList = output.distinct
+        val distinctProjectionList = output.distinct
         val nonKeyColumns = relation.nonKeyColumns.filter {
-          case nkc => distinctProjList.exists(nkc.sqlName == _.name)
+          case nkc => distinctProjectionList.exists(nkc.sqlName == _.name)
         }
 
         var resultRows: Iterator[Row] = null
@@ -205,8 +209,7 @@ class HBaseSQLReaderRDD(
       else {
         // isPointRanges is false
         // calculate the range start
-        val startKey: Option[Any] = expandedCPRs(0).lastRange.start
-        val start = if (startKey.isDefined) {
+        val start = if (expandedCPRs(0).prefix.size > 0) {
           var rowKey = constructRowKey(expandedCPRs(0), isStart = true)
           if (partition.start.isDefined && Bytes.compareTo(partition.start.get, rowKey) > 0) {
             rowKey = partition.start.get
@@ -218,9 +221,8 @@ class HBaseSQLReaderRDD(
 
         // calculate the range end
         val size = expandedCPRs.size - 1
-        val endKey: Option[Any] = expandedCPRs(size).lastRange.end
         val endInclusive: Boolean = expandedCPRs(size).lastRange.endInclusive
-        val end = if (endKey.isDefined) {
+        val end = if (expandedCPRs(size).prefix.size > 0) {
           var finalKey: HBaseRawType = {
             val rowKey = constructRowKey(expandedCPRs(size), isStart = false)
             if (endInclusive) {
