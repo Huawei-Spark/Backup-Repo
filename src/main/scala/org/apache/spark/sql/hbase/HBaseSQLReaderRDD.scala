@@ -121,7 +121,7 @@ class HBaseSQLReaderRDD(
    * construct row key based on the critical point range information
    * @param cpr the critical point range
    * @param isStart the switch between start and end value
-   * @return the encoded row key
+   * @return the encoded row key, or null if the value is None
    */
   private def constructRowKey(cpr: MDCriticalPointRange[_], isStart: Boolean): HBaseRawType = {
     val prefix = cpr.prefix
@@ -132,13 +132,18 @@ class HBaseSQLReaderRDD(
 
     val key = if (isStart) cpr.lastRange.start else cpr.lastRange.end
     val keyType = cpr.lastRange.dt
-    if (key.isDefined) {
+    val list = if (key.isDefined) {
       val tail: (HBaseRawType, NativeType) = {
         (DataTypeUtils.dataToBytes(key.get, keyType), keyType)
       }
-      HBaseKVHelper.encodingRawKeyColumns(head :+ tail)
+      head :+ tail
     } else {
-      HBaseKVHelper.encodingRawKeyColumns(head)
+      head
+    }
+    if (list.size == 0) {
+      null
+    } else {
+      HBaseKVHelper.encodingRawKeyColumns(list)
     }
   }
 
@@ -208,41 +213,44 @@ class HBaseSQLReaderRDD(
       else {
         // isPointRanges is false
         // calculate the range start
-        val start = if (expandedCPRs(0).prefix.size > 0) {
-          var rowKey = constructRowKey(expandedCPRs(0), isStart = true)
-          if (partition.start.isDefined && Bytes.compareTo(partition.start.get, rowKey) > 0) {
-            rowKey = partition.start.get
+        val startRowKey = constructRowKey(expandedCPRs(0), isStart = true)
+        val start = if (startRowKey != null) {
+          if (partition.start.isDefined && Bytes.compareTo(partition.start.get, startRowKey) > 0) {
+            Some(partition.start.get)
+          } else {
+            Some(startRowKey)
           }
-          Some(rowKey)
         } else {
           partition.start
         }
 
         // calculate the range end
         val size = expandedCPRs.size - 1
+        val endKey: Option[Any] = expandedCPRs(size).lastRange.end
         val endInclusive: Boolean = expandedCPRs(size).lastRange.endInclusive
-        val end = if (expandedCPRs(size).prefix.size > 0) {
-          var finalKey: HBaseRawType = {
-            val rowKey = constructRowKey(expandedCPRs(size), isStart = false)
-            if (endInclusive || expandedCPRs(size).lastRange.end.isEmpty) {
-              val newKey = BytesUtils.addOne(rowKey)
-              if (newKey == null) {
-                partition.end.get
-              } else {
-                newKey
-              }
+        val endRowKey = constructRowKey(expandedCPRs(size), isStart = false)
+        val end = if (endRowKey != null) {
+          val finalKey: HBaseRawType = {
+            if (endInclusive || endKey.isEmpty) {
+              BytesUtils.addOne(endRowKey)
             } else {
-              rowKey
+              endRowKey
             }
           }
 
-          if (partition.end.isDefined && Bytes.compareTo(finalKey, partition.end.get) > 0) {
-            finalKey = partition.end.get
+          if (finalKey != null) {
+            if (partition.end.isDefined && Bytes.compareTo(finalKey, partition.end.get) > 0) {
+              Some(partition.end.get)
+            } else {
+              Some(finalKey)
+            }
+          } else {
+            partition.end
           }
-          Some(finalKey)
         } else {
           partition.end
         }
+
 
         val (filters, otherFilters, preds) =
           relation.buildCPRFilterList(output, filterPred, expandedCPRs)
