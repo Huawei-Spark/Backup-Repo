@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.plans.logical
 case class TestData(k: Int, v: String)
 
 object TestData {
-  import TestHbase._
   import TestHbase.implicits._
   
   val testData = TestHbase.sparkContext.parallelize(

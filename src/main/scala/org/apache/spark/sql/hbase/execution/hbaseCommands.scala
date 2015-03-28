@@ -22,7 +22,6 @@ import java.util.Date
 import org.apache.hadoop.conf.Configurable
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
-import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
 import org.apache.hadoop.hbase.util.Bytes
@@ -36,12 +35,12 @@ import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.HBasePartitioner.HBaseRawOrdering
 import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.util.{HBaseKVHelper, Util, DataTypeUtils}
+import org.apache.spark.sql.hbase.util.{Util, DataTypeUtils}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.{Logging, SerializableWritable, SparkEnv, TaskContext}
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer}
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {
@@ -222,6 +221,11 @@ case class BulkLoadIntoTableCommand(
         var recordsWritten = 0L
         var kv: (HBaseRawType, Array[HBaseRawType]) = null
         var prevK: HBaseRawType = null
+        val columnFamilyNames =
+          relation.htable.getTableDescriptor.getColumnFamilies.map(
+          f => {f.getName})
+        var isEmptyRow = true
+
         try {
           while (iter.hasNext) {
             kv = iter.next()
@@ -233,14 +237,27 @@ case class BulkLoadIntoTableCommand(
               writer.write(null, null)
             }
 
+            isEmptyRow = true
             for (i <- 0 until kv._2.size) {
               if (kv._2(i).nonEmpty) {
+                isEmptyRow = false
                 val nkc = relation.nonKeyColumns(i)
                 bytesWritable.set(kv._1)
                 writer.write(bytesWritable, new KeyValue(kv._1, nkc.familyRaw,
                   nkc.qualifierRaw, kv._2(i)))
               }
             }
+
+            if(isEmptyRow) {
+              bytesWritable.set(kv._1)
+              writer.write(bytesWritable,
+                new KeyValue(
+                  kv._1,
+                  columnFamilyNames(0),
+                  HConstants.EMPTY_BYTE_ARRAY,
+                  HConstants.EMPTY_BYTE_ARRAY))
+            }
+
             recordsWritten += 1
 
             prevK = kv._1

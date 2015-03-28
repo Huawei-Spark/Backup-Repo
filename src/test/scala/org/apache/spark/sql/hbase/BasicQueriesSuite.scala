@@ -17,15 +17,14 @@
 
 package org.apache.spark.sql.hbase
 
-class BasicQueriesSuite extends QueriesSuiteBase {
-
+class BasicQueriesSuite extends HBaseTestData {
   var testnm = "StarOperator * with limit"
   test("StarOperator * with limit") {
     val query1 =
-      s"""select * from $tabName limit 3"""
+      s"""select * from $DefaultTableName limit 3"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     assert(result1.size == 3, s"$testnm failed on size")
     val exparr = Array(Array("Row1", 'a', 12345, 23456789, 3456789012345L, 45657.89F, 5678912.345678),
       Array("Row2", 'b', 12342, 23456782, 3456789012342L, 45657.82F, 5678912.345682),
@@ -41,10 +40,10 @@ class BasicQueriesSuite extends QueriesSuiteBase {
     logInfo(result1.mkString)
 
     val sql2 =
-      s"""select * from $tabName limit 2"""
+      s"""select * from $DefaultTableName limit 2"""
         .stripMargin
 
-    val results = runQuery(sql2)
+    val results = runSql(sql2)
     logInfo(s"$sql2 came back with ${results.size} results")
     assert(results.size == 2, s"$testnm failed assertion on size")
     res = {
@@ -60,10 +59,10 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   testnm = "Select all cols with filter"
   test("Select all cols with filter") {
     val query1 =
-      s"""select * from $tabName where shortcol < 12345 limit 2"""
+      s"""select * from $DefaultTableName where shortcol < 12345 limit 2"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
@@ -83,10 +82,10 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   testnm = "Select all cols with order by"
   test("Select all cols with order by") {
     val query1 =
-      s"""select * from $tabName where shortcol < 12344 order by strcol desc limit 2"""
+      s"""select * from $DefaultTableName where shortcol < 12344 order by strcol desc limit 2"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
       Array("Row3", 'c', 12343, 23456783, 3456789012343L, 45657.83F, 5678912.345683),
@@ -105,11 +104,11 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   test("Select same column twice") {
     val query1 =
       s"""select doublecol as double1, doublecol as doublecol
-             | from $tabName
+             | from $DefaultTableName
      | where doublecol > 5678912.345681 and doublecol < 5678912.345683"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 1, s"$testnm failed on size")
     val exparr = Array(
@@ -131,12 +130,12 @@ class BasicQueriesSuite extends QueriesSuiteBase {
     val query1 =
       s"""select doublecol as double1, -1 * doublecol as minusdouble,
          | substr(strcol, 2) as substrcol, doublecol, strcol,
-         | bytecol, shortcol, intcol, longcol, floatcol from $tabName where strcol like
+         | bytecol, shortcol, intcol, longcol, floatcol from $DefaultTableName where strcol like
          |  '%Row%' and shortcol < 12345
          |  and doublecol > 5678912.345681 and doublecol < 5678912.345683 limit 2"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 1, s"$testnm failed on size")
     val exparr = Array(
@@ -158,7 +157,7 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   test("Mixed And/or predicates") {
     val query1 = s"""select doublecol as double1, -1 * doublecol as minusdouble,
      substr(strcol, 2) as substrcol, doublecol, strcol,
-     bytecol, shortcol, intcol, longcol, floatcol from $tabName
+     bytecol, shortcol, intcol, longcol, floatcol from $DefaultTableName
      where strcol like '%Row%'
      and shortcol < 12345
       and doublecol > 5678912.345681 and doublecol < 5678912.345683
@@ -169,7 +168,7 @@ class BasicQueriesSuite extends QueriesSuiteBase {
        AND (intcol is not null and intcol > 0)
        AND (intcol < 0 OR intcol is not null)""".stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
@@ -192,10 +191,10 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   test("In predicates") {
     val query1 = s"""select doublecol as double1, -1 * doublecol as minusdouble,
      substr(strcol, 2) as substrcol, doublecol, strcol,
-     bytecol, shortcol, intcol, longcol, floatcol from $tabName
+     bytecol, shortcol, intcol, longcol, floatcol from $DefaultTableName
      where doublecol IN (doublecol + 5678912.345682 - doublecol, doublecol + 5678912.345683 - doublecol)""".stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
@@ -218,10 +217,10 @@ class BasicQueriesSuite extends QueriesSuiteBase {
   test("InSet predicates") {
     val query1 = s"""select doublecol as double1, -1 * doublecol as minusdouble,
      substr(strcol, 2) as substrcol, doublecol, strcol,
-     bytecol, shortcol, intcol, longcol, floatcol from $tabName
+     bytecol, shortcol, intcol, longcol, floatcol from $DefaultTableName
      where doublecol IN (5678912.345682, 5678912.345683)""".stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     logInfo(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(

@@ -17,12 +17,12 @@
 
 package org.apache.spark.sql.hbase
 
-class AggregateQueriesSuite extends QueriesSuiteBase {
+class AggregateQueriesSuite extends HBaseTestData {
   var testnm = "Group by with cols in select list and with order by"
   test("Group by with cols in select list and with order by") {
     val query =
       s"""select count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecol, max(shortcol) shortcol,
-          max(floatcol) floatcolmax, max(doublecol) doublecol, max(longcol) from $tabName
+          max(floatcol) floatcolmax, max(doublecol) doublecol, max(longcol) from $DefaultTableName
           where strcol like '%Row%' and shortcol < 12345 and doublecol > 5678912.345681
           and doublecol < 5678912.345684
           group by intcol, floatcol, strcol order by strcol desc"""
@@ -35,7 +35,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
     val query = s"""select count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecolmax,
          max(shortcol) shortcolmax, max(floatcol) floatcolmax, max(doublecol) doublecolmax,
          max(longcol) longcolmax
-         from $tabName
+         from $DefaultTableName
          where strcol like '%Row%' and shortcol < 12345 and doublecol > 5678912.345681
          and doublecol < 5678912.345685
          group by intcol, floatcol, strcol
@@ -45,7 +45,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
   }
 
   def testGroupBy(testName: String, query: String) = {
-    val result1 = runQuery(query)
+    val result1 = runSql(query)
     assert(result1.size == 2, s"$testName failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),
@@ -67,13 +67,13 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
   test("Another Group by with cols in select list and with having and order by") {
     val query1 =
       s"""select count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecolmax, max(shortcol) shortcolmax,
-          max(floatcol) floatcolmax, max(doublecol) doublecolmax, max(longcol) longcolmax from $tabName
+          max(floatcol) floatcolmax, max(doublecol) doublecolmax, max(longcol) longcolmax from $DefaultTableName
           where strcol like '%Row%' and shortcol < 12345 and doublecol > 5678912.345681
           and doublecol < 5678912.345685
           group by intcol, floatcol, strcol having max(doublecol) < 5678912.345684 order by strcol desc"""
         .stripMargin
 
-    val result1 = runQuery(query1)
+    val result1 = runSql(query1)
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),

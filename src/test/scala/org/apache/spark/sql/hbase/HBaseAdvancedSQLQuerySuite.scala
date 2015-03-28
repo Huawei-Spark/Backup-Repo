@@ -20,11 +20,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SQLConf, _}
 
-class HBaseAdvancedSQLQuerySuite extends HBaseIntegrationTestBase {
-  // Make sure the tables are loaded.
-  HBaseMainTest.main(null)
-  TestData
-
+class HBaseAdvancedSQLQuerySuite extends HBaseSplitedTestData {
   import org.apache.spark.sql.hbase.TestHbase._
   import org.apache.spark.sql.hbase.TestHbase.implicits._
 

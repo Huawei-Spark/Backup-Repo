@@ -87,8 +87,50 @@ abstract class HBaseIntegrationTestBase
     checkAnswer(rdd, Seq(expectedAnswer))
   }
 
+  def runSql(sql: String) = {
+    logInfo(sql)
+    TestHbase.sql(sql).collect()
+  }
+
   override protected def afterAll(): Unit = {
     val msg = s"Test ${getClass.getName} completed at ${(new java.util.Date).toString} duration=${((new java.util.Date).getTime - startTime) / 1000}"
     logInfo(msg)
+  }
+
+  val CompareTol = 1e-6
+
+  def compareWithTol(actarr: Seq[Any], exparr: Seq[Any], emsg: String): Boolean = {
+    actarr.zip(exparr).forall { case (aa, ee) =>
+      val eq = (aa, ee) match {
+        case (a: Double, e: Double) =>
+          Math.abs(a - e) <= CompareTol
+        case (a: Float, e: Float) =>
+          Math.abs(a - e) <= CompareTol
+        case (a: Byte, e)  => true //For now, we assume it is ok
+        case (a, e) =>
+          if(a == null && e == null) {
+            logDebug(s"a=null e=null")
+          } else {
+            logDebug(s"atype=${a.getClass.getName} etype=${e.getClass.getName}")
+          }
+          a == e
+        case _ => throw new IllegalArgumentException("Expected tuple")
+      }
+      if (!eq) {
+        logError(s"$emsg: Mismatch- act=$aa exp=$ee")
+      }
+      eq
+    }
+  }
+
+  def verify(testName: String, sql: String, result1: Seq[Seq[Any]], exparr: Seq[Seq[Any]]) = {
+    val res = {
+      for (rx <- 0 until exparr.size)
+      yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
+    }.foldLeft(true) { case (res1, newres) => res1 && newres}
+
+    logInfo(s"$sql came back with ${result1.size} results")
+    logInfo(result1.mkString)
+    assert(res, "One or more rows did not match expected")
   }
 }

@@ -26,22 +26,21 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.TestData._
 import org.apache.spark.sql.types._
 
-class HBaseSQLQuerySuite extends HBaseIntegrationTestBase {
+class HBaseSQLQuerySuite extends HBaseSplitedTestData {
   // Make sure the tables are loaded.
-  HBaseMainTest.main(null)
-  TestData
-
   import org.apache.spark.sql.hbase.TestHbase._
   import org.apache.spark.sql.hbase.TestHbase.implicits._
 
   var origZone: TimeZone = _
 
   override protected def beforeAll() {
+    super.beforeAll()
     origZone = TimeZone.getDefault
     TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
   }
 
   override protected def afterAll() {
+    super.afterAll()
     TimeZone.setDefault(origZone)
   }
 

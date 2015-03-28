@@ -26,7 +26,7 @@ import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.hbase.util.BytesUtils
 import org.apache.spark.sql.types.IntegerType
 
-class BulkLoadIntoTableSuite extends QueriesSuiteBase {
+class BulkLoadIntoTableSuite extends HBaseTestData {
   val sc: SparkContext = TestHbase.sparkContext
   val hbaseHome = {
     val loader = this.getClass.getClassLoader
@@ -210,14 +210,15 @@ class BulkLoadIntoTableSuite extends QueriesSuiteBase {
 
     val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
     val rows = sqlResult.collect()
-    assert(rows.length == 3, s"load parall data with null column values into hbase")
+    assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
     assert(rows(1)(2) == null, s"load parall data into hbase test failed to select empty-string col2 value")
     assert(rows(2)(3) == null, s"load parall data into hbase test failed to select null col3 value")
     checkAnswer(sqlResult,
       Row("row1", null, "8", "101") ::
         Row("row2", "2", null, "102") ::
-        Row("row3", "3", "10", null) :: Nil)
+        Row("row3", "3", "10", null) ::
+        Row("row4", null, null, null):: Nil)
 
     // cleanup
     TestHbase.sql(drop)
@@ -261,14 +262,15 @@ class BulkLoadIntoTableSuite extends QueriesSuiteBase {
 
     val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
     val rows = sqlResult.collect()
-    assert(rows.length == 3, s"load parall data with null column values into hbase")
+    assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
     assert(rows(1)(2) == null, s"load parall data into hbase test failed to select empty-string col2 value")
     assert(rows(2)(3) == null, s"load parall data into hbase test failed to select null col3 value")
     checkAnswer(sqlResult,
       Row("row1", null, "8", "101") ::
         Row("row2", "2", null, "102") ::
-        Row("row3", "3", "10", null) :: Nil)
+        Row("row3", "3", "10", null) ::
+        Row("row4", null, null, null):: Nil)
 
     // cleanup
     TestHbase.sql(drop)

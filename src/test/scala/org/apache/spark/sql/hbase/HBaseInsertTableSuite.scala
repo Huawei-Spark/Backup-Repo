@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.Row
 
-class HBaseInsertTableSuite extends QueriesSuiteBase {
+class HBaseInsertTableSuite extends HBaseTestData {
 
   var testnm = "Insert all rows to the table from other table"
   test("Insert all rows to the table from other table") {
@@ -29,21 +29,21 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
             MAPPED BY (hinsertTestTable, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
       .stripMargin
-    runQuery(createQuery)
+    runSql(createQuery)
 
     val insertQuery =
-      s"""insert into insertTestTable select * from $tabName"""
+      s"""insert into insertTestTable select * from $DefaultTableName"""
         .stripMargin
-    runQuery(insertQuery)
+    runSql(insertQuery)
 
     val testQuery = "select * from insertTestTable"
-    val testResult = runQuery(testQuery)
-    val targetResult = runQuery(s"select * from $tabName")
+    val testResult = runSql(testQuery)
+    val targetResult = runSql(s"select * from $DefaultTableName")
     assert(testResult.size == targetResult.size, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
-    runQuery("Drop Table insertTestTable")
+    runSql("Drop Table insertTestTable")
   }
 
   testnm = "Insert few rows to the table from other table after applying filter"
@@ -54,22 +54,22 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
             MAPPED BY (hinsertTestTableFilter, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
       .stripMargin
-    runQuery(createQuery)
+    runSql(createQuery)
 
     val insertQuery =
-      s"""insert into insertTestTableFilter select * from $tabName 
+      s"""insert into insertTestTableFilter select * from $DefaultTableName 
         where doublecol > 5678912.345681"""
         .stripMargin
-    runQuery(insertQuery)
+    runSql(insertQuery)
 
     val testQuery = "select * from insertTestTableFilter"
-    val testResult = runQuery(testQuery)
-    val targetResult = runQuery(s"select * from $tabName where doublecol > 5678912.345681")
+    val testResult = runSql(testQuery)
+    val targetResult = runSql(s"select * from $DefaultTableName where doublecol > 5678912.345681")
     assert(testResult.size == targetResult.size, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
-    runQuery("Drop Table insertTestTableFilter")
+    runSql("Drop Table insertTestTableFilter")
   }
 
   def compareResults(fetchResult: Array[Row], targetResult: Array[Row]) = {
@@ -87,24 +87,24 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
             MAPPED BY (hinsertTestTableFewCols, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol])"""
       .stripMargin
-    runQuery(createQuery)
+    runSql(createQuery)
 
     val insertQuery =
       s"""insert into insertTestTableFewCols select strcol, bytecol,
-        shortcol, intcol from $tabName order by strcol"""
+        shortcol, intcol from $DefaultTableName order by strcol"""
         .stripMargin
-    runQuery(insertQuery)
+    runSql(insertQuery)
 
     val testQuery =
       "select strcol, bytecol, shortcol, intcol from insertTestTableFewCols order by strcol"
-    val testResult = runQuery(testQuery)
+    val testResult = runSql(testQuery)
     val targetResult =
-      runQuery(s"select strcol, bytecol, shortcol, intcol from $tabName order by strcol")
+      runSql(s"select strcol, bytecol, shortcol, intcol from $DefaultTableName order by strcol")
     assert(testResult.size == targetResult.size, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
-    runQuery("Drop Table insertTestTableFewCols")
+    runSql("Drop Table insertTestTableFewCols")
   }
 
   testnm = "Insert into values test"
@@ -114,17 +114,17 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
             MAPPED BY (hinsertValuesTest, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol])"""
       .stripMargin
-    runQuery(createQuery)
+    runSql(createQuery)
 
     val insertQuery1 = s"insert into insertValuesTest values('Row0','a',12340,23456780)"
     val insertQuery2 = s"insert into insertValuesTest values('Row1','b',12345,23456789)"
     val insertQuery3 = s"insert into insertValuesTest values('Row2','c',12342,23456782)"
-    runQuery(insertQuery1)
-    runQuery(insertQuery2)
-    runQuery(insertQuery3)
+    runSql(insertQuery1)
+    runSql(insertQuery2)
+    runSql(insertQuery3)
 
     val testQuery = "select * from insertValuesTest order by strcol"
-    val testResult = runQuery(testQuery)
+    val testResult = runSql(testQuery)
     assert(testResult.size == 3, s"$testnm failed on size")
 
     val exparr = Array(Array("Row0", 'a', 12340, 23456780),
@@ -137,7 +137,7 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
 
-    runQuery("Drop Table insertValuesTest")
+    runSql("Drop Table insertValuesTest")
   }
 
   testnm = "Insert nullable values test"
@@ -147,17 +147,17 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
             MAPPED BY (hinsertNullValuesTest, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, intcol=cf1.hintcol])"""
       .stripMargin
-    runQuery(createQuery)
+    runSql(createQuery)
 
     val insertQuery1 = s"insert into insertNullValuesTest values('Row0', null,  12340, 23456780)"
     val insertQuery2 = s"insert into insertNullValuesTest values('Row1', 'b',   null, 23456789)"
     val insertQuery3 = s"insert into insertNullValuesTest values('Row2', 'c',  12342, null)"
-    runQuery(insertQuery1)
-    runQuery(insertQuery2)
-    runQuery(insertQuery3)
+    runSql(insertQuery1)
+    runSql(insertQuery2)
+    runSql(insertQuery3)
 
     val selectAllQuery = "select * from insertNullValuesTest order by strcol"
-    val selectAllResult = runQuery(selectAllQuery)
+    val selectAllResult = runSql(selectAllQuery)
 
     assert(selectAllResult.size == 3, s"$testnm failed on size")
 
@@ -189,7 +189,7 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
     // test 'where col is not null'
 
     val selectWhereIsNotNullQuery = "select * from insertNullValuesTest where intcol is not null order by strcol"
-    val selectWhereIsNotNullResult = runQuery(selectWhereIsNotNullQuery)
+    val selectWhereIsNotNullResult = runSql(selectWhereIsNotNullQuery)
     assert(selectWhereIsNotNullResult.size == 2, s"$testnm failed on size")
 
     currentResultRow = 0
@@ -207,7 +207,7 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
     assert(selectWhereIsNotNullResult(currentResultRow)(3) == 23456789, s"$testnm failed on returned Row1, col3 value")
 
 
-    runQuery("Drop Table insertNullValuesTest")
+    runSql("  Drop Table insertNullValuesTest")
   }
 
 
