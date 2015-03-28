@@ -40,7 +40,7 @@ import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.{Logging, SerializableWritable, SparkEnv, TaskContext}
 
-import scala.collection.mutable.{ArrayBuffer}
+import scala.collection.mutable.ArrayBuffer
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {

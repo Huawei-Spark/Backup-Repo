@@ -66,14 +66,14 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
   private[spark] override def asNullable: RangeType[T] = this
 
   def toPartiallyOrderingDataType(s: Any, dt: NativeType): Any = s match {
-    case i: Int => new Range[Int](Some(i), true, Some(i), true, IntegerType)
-    case l: Long => new Range[Long](Some(l), true, Some(l), true, LongType)
+    case b: Boolean => new Range[Boolean](Some(b), true, Some(b), true, BooleanType)
+    case b: Byte => new Range[Byte](Some(b), true, Some(b), true, ByteType)
     case d: Double => new Range[Double](Some(d), true, Some(d), true, DoubleType)
     case f: Float => new Range[Float](Some(f), true, Some(f), true, FloatType)
-    case b: Byte => new Range[Byte](Some(b), true, Some(b), true, ByteType)
+    case i: Int => new Range[Int](Some(i), true, Some(i), true, IntegerType)
+    case l: Long => new Range[Long](Some(l), true, Some(l), true, LongType)
     case s: Short => new Range[Short](Some(s), true, Some(s), true, ShortType)
     case s: String => new Range[String](Some(s), true, Some(s), true, StringType)
-    case b: Boolean => new Range[Boolean](Some(b), true, Some(b), true, BooleanType)
     case t: Timestamp => new Range[Timestamp](Some(t), true, Some(t), true, TimestampType)
     case _ => s
   }
@@ -182,36 +182,36 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
 
 object RangeType {
 
-  object StringRangeType extends RangeType[String]
+  object BooleanRangeType extends RangeType[Boolean]
 
-  object IntegerRangeType extends RangeType[Int]
+  object ByteRangeType extends RangeType[Byte]
 
-  object LongRangeType extends RangeType[Long]
+  object DecimalRangeType extends RangeType[BigDecimal]
 
   object DoubleRangeType extends RangeType[Double]
 
   object FloatRangeType extends RangeType[Float]
 
-  object ByteRangeType extends RangeType[Byte]
+  object IntegerRangeType extends RangeType[Int]
+
+  object LongRangeType extends RangeType[Long]
 
   object ShortRangeType extends RangeType[Short]
 
-  object BooleanRangeType extends RangeType[Boolean]
-
-  object DecimalRangeType extends RangeType[BigDecimal]
+  object StringRangeType extends RangeType[String]
 
   object TimestampRangeType extends RangeType[Timestamp]
 
   val primitiveToPODataTypeMap: HashMap[NativeType, PartialOrderingDataType] =
     HashMap(
-      IntegerType -> IntegerRangeType,
-      LongType -> LongRangeType,
+      BooleanType -> BooleanRangeType,
+      ByteType -> ByteRangeType,
       DoubleType -> DoubleRangeType,
       FloatType -> FloatRangeType,
-      ByteType -> ByteRangeType,
+      IntegerType -> IntegerRangeType,
+      LongType -> LongRangeType,
       ShortType -> ShortRangeType,
-      BooleanType -> BooleanRangeType,
-      TimestampType -> TimestampRangeType,
-      StringType -> StringRangeType
+      StringType -> StringRangeType,
+      TimestampType -> TimestampRangeType
     )
 }

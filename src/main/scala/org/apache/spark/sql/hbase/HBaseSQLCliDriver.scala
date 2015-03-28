@@ -115,7 +115,6 @@ object HBaseSQLCliDriver extends Logging {
       case e: Exception =>
         e.printStackTrace()
     }
-
   }
 
   private def process(input: String) = {

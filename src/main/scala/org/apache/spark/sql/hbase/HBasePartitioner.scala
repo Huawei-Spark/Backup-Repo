@@ -55,7 +55,7 @@ class HBasePartitioner (var splitKeys: Array[HBaseRawType]) extends Partitioner 
       while (partition < realSplitKeys.length && ordering.gt(k, realSplitKeys(partition))) {
         partition += 1
       }
-    } else { // todo(wf): we need test this branch
+    } else {
       // Determine which binary search method to use only once.
       partition = binarySearch(realSplitKeys, k)
       // binarySearch either returns the match location or -[insertion point]-1
@@ -86,33 +86,5 @@ class HBasePartitioner (var splitKeys: Array[HBaseRawType]) extends Partitioner 
     }
     result = prime * result
     result
-  }
-
-  @throws(classOf[IOException])
-  private def writeObject(out: ObjectOutputStream) {
-    val sfactory = SparkEnv.get.serializer
-    sfactory match {
-      case js: JavaSerializer => out.defaultWriteObject()
-      case _ =>
-        out.writeObject(binarySearch)
-
-        val ser = sfactory.newInstance()
-        Utils.serializeViaNestedStream(out, ser) { stream =>
-          stream.writeObject(splitKeys)
-        }
-    }
-  }
-
-  @throws(classOf[IOException])
-  private def readObject(in: ObjectInputStream) {
-    val sfactory = SparkEnv.get.serializer
-    sfactory match {
-      case js: JavaSerializer => in.defaultReadObject()
-      case _ =>
-        val ser = sfactory.newInstance()
-        Utils.deserializeViaNestedStream(in, ser) { ds =>
-          splitKeys = ds.readObject[Array[HBaseRawType]]()
-        }
-    }
   }
 }

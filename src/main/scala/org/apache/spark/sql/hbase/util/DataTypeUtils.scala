@@ -35,14 +35,14 @@ object DataTypeUtils {
    */
   def bytesToData(src: HBaseRawType, offset: Int, length: Int, dt: DataType): Any = {
     dt match {
-      case StringType => BytesUtils.toString(src, offset, length)
-      case IntegerType => BytesUtils.toInt(src, offset)
       case BooleanType => BytesUtils.toBoolean(src, offset)
       case ByteType => src(offset)
       case DoubleType => BytesUtils.toDouble(src, offset)
       case FloatType => BytesUtils.toFloat(src, offset)
+      case IntegerType => BytesUtils.toInt(src, offset)
       case LongType => BytesUtils.toLong(src, offset)
       case ShortType => BytesUtils.toShort(src, offset)
+      case StringType => BytesUtils.toString(src, offset, length)
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -58,14 +58,14 @@ object DataTypeUtils {
     // TODO: avoid new instance per invocation
     val bu = BytesUtils.create(dt)
     dt match {
-      case StringType => bu.toBytes(src.asInstanceOf[String])
-      case IntegerType => bu.toBytes(src.asInstanceOf[Int])
       case BooleanType => bu.toBytes(src.asInstanceOf[Boolean])
       case ByteType => bu.toBytes(src.asInstanceOf[Byte])
       case DoubleType => bu.toBytes(src.asInstanceOf[Double])
       case FloatType => bu.toBytes(src.asInstanceOf[Float])
+      case IntegerType => bu.toBytes(src.asInstanceOf[Int])
       case LongType => bu.toBytes(src.asInstanceOf[Long])
       case ShortType => bu.toBytes(src.asInstanceOf[Short])
+      case StringType => bu.toBytes(src.asInstanceOf[String])
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -90,14 +90,14 @@ object DataTypeUtils {
       return
     }
     dt match {
-      case StringType => row.setString(index, BytesUtils.toString(src, offset, length))
-      case IntegerType => row.setInt(index, BytesUtils.toInt(src, offset))
       case BooleanType => row.setBoolean(index, BytesUtils.toBoolean(src, offset))
       case ByteType => row.setByte(index, BytesUtils.toByte(src, offset))
       case DoubleType => row.setDouble(index, BytesUtils.toDouble(src, offset))
       case FloatType => row.setFloat(index, BytesUtils.toFloat(src, offset))
+      case IntegerType => row.setInt(index, BytesUtils.toInt(src, offset))
       case LongType => row.setLong(index, BytesUtils.toLong(src, offset))
       case ShortType => row.setShort(index, BytesUtils.toShort(src, offset))
+      case StringType => row.setString(index, BytesUtils.toString(src, offset, length))
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -132,14 +132,14 @@ object DataTypeUtils {
 
     val bu = BytesUtils.create(dt)
     dt match {
-      case StringType => bu.toBytes(row.getString(index))
-      case IntegerType => bu.toBytes(row.getInt(index))
       case BooleanType => bu.toBytes(row.getBoolean(index))
       case ByteType => bu.toBytes(row.getByte(index))
       case DoubleType => bu.toBytes(row.getDouble(index))
       case FloatType => bu.toBytes(row.getFloat(index))
+      case IntegerType => bu.toBytes(row.getInt(index))
       case LongType => bu.toBytes(row.getLong(index))
       case ShortType => bu.toBytes(row.getShort(index))
+      case StringType => bu.toBytes(row.getString(index))
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -152,6 +152,7 @@ object DataTypeUtils {
    */
   def getBinaryComparator(bu: BytesUtils, expression: Literal): BinaryComparator = {
     expression.dataType match {
+      case BooleanType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Boolean]))
       case ByteType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Byte]))
       case DoubleType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Double]))
       case FloatType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Float]))
@@ -159,7 +160,6 @@ object DataTypeUtils {
       case LongType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Long]))
       case ShortType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Short]))
       case StringType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[String]))
-      case BooleanType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Boolean]))
       case _ => throw new Exception("Cannot convert the data type using BinaryComparator")
     }
   }
