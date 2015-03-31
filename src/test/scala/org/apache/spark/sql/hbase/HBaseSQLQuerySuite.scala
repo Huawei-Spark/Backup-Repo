@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.TestData._
 import org.apache.spark.sql.types._
 
-class HBaseSQLQuerySuite extends HBaseSplitedTestData {
+class HBaseSQLQuerySuite extends HBaseSplitTestData {
   // Make sure the tables are loaded.
   import org.apache.spark.sql.hbase.TestHbase._
   import org.apache.spark.sql.hbase.TestHbase.implicits._

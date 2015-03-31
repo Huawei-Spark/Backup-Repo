@@ -21,7 +21,7 @@ package org.apache.spark.sql.hbase
  * Test insert / query against the table created by HBaseMainTest
  */
 
-class HBaseBasicOperationSuite extends HBaseSplitedTestData {
+class HBaseBasicOperationSuite extends HBaseSplitTestData {
   import org.apache.spark.sql.hbase.TestHbase._
 
   override def afterAll() = {
@@ -43,22 +43,28 @@ class HBaseBasicOperationSuite extends HBaseSplitedTestData {
           column4=family2.qualifier2])"""
     )
 
-    assert(sql( """SELECT * FROM tb0""").count() == 0)
+    assert(sql( """SELECT * FROM tb0""").collect().size == 0)
     sql( """INSERT INTO tb0 SELECT col4,col4,col6,col3 FROM ta""")
-    assert(sql( """SELECT * FROM tb0""").count() == 14)
+    assert(sql( """SELECT * FROM tb0""").collect().size == 14)
 
     sql( """DROP TABLE tb0""")
   }
 
-  test("Insert Into table 1") {
+  test("Insert and Query Single Row") {
     sql( """CREATE TABLE tb1 (column1 INTEGER, column2 STRING,
-          PRIMARY KEY(column2))
-          MAPPED BY (ht1, COLS=[column1=cf.cq])"""
+          PRIMARY KEY(column1))
+          MAPPED BY (ht1, COLS=[column2=cf.cq])"""
     )
 
-    assert(sql( """SELECT * FROM tb1""").count() == 0)
+    assert(sql( """SELECT * FROM tb1""").collect().size == 0)
     sql( """INSERT INTO tb1 VALUES (1024, "abc")""")
-    assert(sql( """SELECT * FROM tb1""").count() == 1)
+    sql( """INSERT INTO tb1 VALUES (1028, "abd")""")
+    assert(sql( """SELECT * FROM tb1""").collect().size == 2)
+    assert(
+      sql( """SELECT * FROM tb1 WHERE (column1 = 1023 AND column2 ="abc")""").collect().size == 0)
+    assert(sql(
+      """SELECT * FROM tb1 WHERE (column1 = 1024)
+        |OR (column1 = 1028 AND column2 ="abd")""".stripMargin).collect().size == 2)
 
     sql( """DROP TABLE tb1""")
   }
@@ -81,13 +87,13 @@ class HBaseBasicOperationSuite extends HBaseSplitedTestData {
   }
 
   test("Select test 1 (AND, OR)") {
-    assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").count == 2)
-    assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").count == 4)
+    assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").collect().size == 2)
+    assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").collect().size == 4)
   }
 
   test("Select test 2 (WHERE)") {
     assert(sql( """SELECT * FROM ta WHERE col7 > 128""").count() == 3)
-    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").count() == 1)
+    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").collect().size == 1)
   }
 
   test("Select test 3 (ORDER BY)") {
@@ -100,10 +106,10 @@ class HBaseBasicOperationSuite extends HBaseSplitedTestData {
   }
 
   test("Select test 4 (join)") {
-    assert(sql( """SELECT ta.col2 FROM ta join tb on ta.col4=tb.col7""").count == 2)
-    assert(sql( """SELECT * FROM ta FULL OUTER JOIN tb WHERE tb.col7 = 1""").count == 14)
-    assert(sql( """SELECT * FROM ta LEFT JOIN tb WHERE tb.col7 = 1""").count == 14)
-    assert(sql( """SELECT * FROM ta RIGHT JOIN tb WHERE tb.col7 = 1""").count == 14)
+    assert(sql( """SELECT ta.col2 FROM ta join tb on ta.col4=tb.col7""").collect().size == 2)
+    assert(sql( """SELECT * FROM ta FULL OUTER JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
+    assert(sql( """SELECT * FROM ta LEFT JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
+    assert(sql( """SELECT * FROM ta RIGHT JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
   }
 
   test("Alter Add column and Alter Drop column") {

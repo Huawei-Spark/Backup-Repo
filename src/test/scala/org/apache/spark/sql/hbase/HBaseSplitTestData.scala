@@ -30,7 +30,7 @@ import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils
  * HBaseMainTest
  * create HbTestTable and metadata table, and insert some data
  */
-class HBaseSplitedTestData extends HBaseIntegrationTestBase
+class HBaseSplitTestData extends HBaseIntegrationTestBase
 {
   val TableName_a: String = "ta"
   val TableName_b: String = "tb"

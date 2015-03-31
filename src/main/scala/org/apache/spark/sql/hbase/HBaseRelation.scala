@@ -815,11 +815,8 @@ private[hbase] case class HBaseRelation(
 
   def buildRow(projections: Seq[(Attribute, Int)],
                result: Result,
-               buffer: ListBuffer[HBaseRawType],
-               aBuffer: ArrayBuffer[Byte],
                row: MutableRow): Row = {
     assert(projections.size == row.length, "Projection size and row size mismatched")
-    // TODO: replaced with the new Key method
     val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach {
       p =>

@@ -54,10 +54,8 @@ class HBaseSQLReaderRDD(
   }
 
   private def createIterator(context: TaskContext,
-                     scanner: ResultScanner, otherFilters: Option[Expression]): Iterator[Row] = {
-    val lBuffer = ListBuffer[HBaseRawType]()
-    val aBuffer = ArrayBuffer[Byte]()
-
+                             scanner: ResultScanner,
+                             otherFilters: Option[Expression]): Iterator[Row] = {
     var finalOutput = output.distinct
     if (otherFilters.isDefined) {
       finalOutput = finalOutput.union(otherFilters.get.references.toSeq)
@@ -95,7 +93,7 @@ class HBaseSQLReaderRDD(
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, lBuffer, aBuffer, row)
+          relation.buildRow(projections, result, row)
         } else {
           null
         }
@@ -182,33 +180,33 @@ class HBaseSQLReaderRDD(
           case nkc => distinctProjectionList.exists(nkc.sqlName == _.name)
         }
 
-        var resultRows: Iterator[Row] = null
-
-        for (range <- expandedCPRs) {
+        def generateGet(range: MDCriticalPointRange[_]): Get = {
           val rowKey = constructRowKey(range, isStart = true)
           val get = new Get(rowKey)
           for (nonKeyColumn <- nonKeyColumns) {
             get.addColumn(Bytes.toBytes(nonKeyColumn.family), Bytes.toBytes(nonKeyColumn.qualifier))
           }
-
-          gets.add(get)
-          val results = relation.htable.get(gets)
-          val predicate = range.lastRange.pred
-
-          val lBuffer = ListBuffer[HBaseRawType]()
-          val aBuffer = ArrayBuffer[Byte]()
-          val row = new GenericMutableRow(output.size)
-          val projections = output.zipWithIndex
-
-          resultRows = if (predicate == null) {
-            results.map(relation.buildRow(projections, _, lBuffer, aBuffer, row)).toIterator
-          } else {
-            val boundPredicate = BindReferences.bindReference(predicate, output)
-            results.map(relation.buildRow(projections, _, lBuffer, aBuffer, row))
-              .filter(boundPredicate.eval(_).asInstanceOf[Boolean]).toIterator
-          }
+          get
         }
-        resultRows
+        val predForEachRange: Seq[Expression] = expandedCPRs.map(range => {
+          gets.add(generateGet(range))
+          range.lastRange.pred
+        })
+        val resultsWithPred = relation.htable.get(gets).zip(predForEachRange).filter(!_._1.isEmpty)
+
+        def evalResultForBoundPredicate(input: Row, predicate: Expression): Boolean = {
+          val boundPredicate = BindReferences.bindReference(predicate, output)
+          boundPredicate.eval(input).asInstanceOf[Boolean]
+        }
+        val projections = output.zipWithIndex
+        val resultRows: Seq[Row] = for {
+          (result, predicate) <- resultsWithPred
+          row = new GenericMutableRow(output.size)
+          resultRow = relation.buildRow(projections, result, row)
+          if predicate == null || evalResultForBoundPredicate(resultRow, predicate)
+        } yield resultRow
+
+        resultRows.toIterator
       }
       else {
         // isPointRanges is false
