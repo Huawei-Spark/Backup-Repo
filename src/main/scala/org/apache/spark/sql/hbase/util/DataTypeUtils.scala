@@ -18,6 +18,7 @@ package org.apache.spark.sql.hbase.util
 
 import org.apache.hadoop.hbase.filter.BinaryComparator
 import org.apache.spark.sql.catalyst.expressions.{Literal, MutableRow, Row}
+import org.apache.spark.sql.execution.SparkSqlSerializer
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase._
 
@@ -36,7 +37,7 @@ object DataTypeUtils {
   def bytesToData(src: HBaseRawType, offset: Int, length: Int, dt: DataType): Any = {
     dt match {
       case BooleanType => BytesUtils.toBoolean(src, offset)
-      case ByteType => src(offset)
+      case ByteType => BytesUtils.toByte(src, offset)
       case DoubleType => BytesUtils.toDouble(src, offset)
       case FloatType => BytesUtils.toFloat(src, offset)
       case IntegerType => BytesUtils.toInt(src, offset)
@@ -56,7 +57,7 @@ object DataTypeUtils {
   def dataToBytes(src: Any,
                   dt: DataType): HBaseRawType = {
     // TODO: avoid new instance per invocation
-    val bu = BytesUtils.create(dt)
+    lazy val bu = BytesUtils.create(dt)
     dt match {
       case BooleanType => bu.toBytes(src.asInstanceOf[Boolean])
       case ByteType => bu.toBytes(src.asInstanceOf[Byte])
@@ -66,6 +67,7 @@ object DataTypeUtils {
       case LongType => bu.toBytes(src.asInstanceOf[Long])
       case ShortType => bu.toBytes(src.asInstanceOf[Short])
       case StringType => bu.toBytes(src.asInstanceOf[String])
+      case ArrayType(_, _) => SparkSqlSerializer.serialize[Any](src)
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -98,6 +100,7 @@ object DataTypeUtils {
       case LongType => row.setLong(index, BytesUtils.toLong(src, offset))
       case ShortType => row.setShort(index, BytesUtils.toShort(src, offset))
       case StringType => row.setString(index, BytesUtils.toString(src, offset, length))
+      case ArrayType(_,_) => row.update(index, SparkSqlSerializer.deserialize[Any](src))
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }

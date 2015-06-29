@@ -115,7 +115,7 @@ class HBaseSplitTestData extends HBaseIntegrationTestBase
       val row = new GenericRow(keys.toArray)
       val key = makeRowKey(row, keysType)
       val put = new Put(key)
-      Seq((vals(0), valsType(0), "cf1", "cq11"),
+      Seq((vals.head, valsType.head, "cf1", "cq11"),
         (vals(1), valsType(1), "cf1", "cq12"),
         (vals(2), valsType(2), "cf2", "cq21"),
         (vals(3), valsType(3), "cf2", "cq22")).foreach {

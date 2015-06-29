@@ -42,9 +42,9 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
           column4=family2.qualifier2])"""
     )
 
-    assert(sql( """SELECT * FROM tb0""").collect().size == 0)
+    assert(sql( """SELECT * FROM tb0""").collect().length == 0)
     sql( """INSERT INTO tb0 SELECT col4,col4,col6,col3 FROM ta""")
-    assert(sql( """SELECT * FROM tb0""").collect().size == 14)
+    assert(sql( """SELECT * FROM tb0""").collect().length == 14)
 
     sql( """DROP TABLE tb0""")
   }
@@ -55,15 +55,15 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
           MAPPED BY (ht1, COLS=[column2=cf.cq])"""
     )
 
-    assert(sql( """SELECT * FROM tb1""").collect().size == 0)
+    assert(sql( """SELECT * FROM tb1""").collect().length == 0)
     sql( """INSERT INTO tb1 VALUES (1024, "abc")""")
     sql( """INSERT INTO tb1 VALUES (1028, "abd")""")
-    assert(sql( """SELECT * FROM tb1""").collect().size == 2)
+    assert(sql( """SELECT * FROM tb1""").collect().length == 2)
     assert(
-      sql( """SELECT * FROM tb1 WHERE (column1 = 1023 AND column2 ="abc")""").collect().size == 0)
+      sql( """SELECT * FROM tb1 WHERE (column1 = 1023 AND column2 ="abc")""").collect().length == 0)
     assert(sql(
       """SELECT * FROM tb1 WHERE (column1 = 1024)
-        |OR (column1 = 1028 AND column2 ="abd")""".stripMargin).collect().size == 2)
+        |OR (column1 = 1028 AND column2 ="abd")""".stripMargin).collect().length == 2)
 
     sql( """DROP TABLE tb1""")
   }
@@ -86,13 +86,13 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
   }
 
   test("Select test 1 (AND, OR)") {
-    assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").collect().size == 2)
-    assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").collect().size == 4)
+    assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").collect().length == 2)
+    assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").collect().length == 4)
   }
 
   test("Select test 2 (WHERE)") {
     assert(sql( """SELECT * FROM ta WHERE col7 > 128""").count() == 3)
-    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").collect().size == 1)
+    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").collect().length == 1)
   }
 
   test("Select test 3 (ORDER BY)") {
@@ -105,10 +105,10 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
   }
 
   test("Select test 4 (join)") {
-    assert(sql( """SELECT ta.col2 FROM ta join tb on ta.col4=tb.col7""").collect().size == 2)
-    assert(sql( """SELECT * FROM ta FULL OUTER JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
-    assert(sql( """SELECT * FROM ta LEFT JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
-    assert(sql( """SELECT * FROM ta RIGHT JOIN tb WHERE tb.col7 = 1""").collect().size == 14)
+    assert(sql( """SELECT ta.col2 FROM ta join tb on ta.col4=tb.col7""").collect().length == 2)
+    assert(sql( """SELECT * FROM ta FULL OUTER JOIN tb WHERE tb.col7 = 1""").collect().length == 14)
+    assert(sql( """SELECT * FROM ta LEFT JOIN tb WHERE tb.col7 = 1""").collect().length == 14)
+    assert(sql( """SELECT * FROM ta RIGHT JOIN tb WHERE tb.col7 = 1""").collect().length == 14)
   }
 
   test("Alter Add column and Alter Drop column") {

@@ -56,8 +56,10 @@ object HBaseKVHelper {
    * @param keyColumns the sequence of key columns
    * @return sequence of information in (offset, length) tuple
    */
-  def decodingRawKeyColumns(rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[(Int, Int)] = {
-    var index = 0
+  def decodingRawKeyColumns(rowKey: HBaseRawType,
+                            keyColumns: Seq[KeyColumn],
+                            startIndex: Int = 0): Seq[(Int, Int)] = {
+    var index = startIndex
     keyColumns.map {
       case c =>
         if (index >= rowKey.length) (-1, -1)
@@ -96,7 +98,7 @@ object HBaseKVHelper {
       keyBytes(kc.order) = (string2Bytes(values(ordinal), lineBuffer(ordinal)),
         relation.output(ordinal).dataType)
     })
-    for (i <- 0 until relation.nonKeyColumns.size) {
+    for (i <- relation.nonKeyColumns.indices) {
       val nkc = relation.nonKeyColumns(i)
       val bytes =  {
         // we should not use the same buffer in bulk-loading otherwise it will lead to corrupted

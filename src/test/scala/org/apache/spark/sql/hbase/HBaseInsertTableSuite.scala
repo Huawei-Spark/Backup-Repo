@@ -39,7 +39,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     val testQuery = "SELECT * FROM insertTestTable"
     val testResult = runSql(testQuery)
     val targetResult = runSql(s"SELECT * FROM $DefaultTableName")
-    assert(testResult.size == targetResult.size, s"$testnm failed on size")
+    assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
@@ -65,7 +65,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     val testQuery = "select * from insertTestTableFilter"
     val testResult = runSql(testQuery)
     val targetResult = runSql(s"select * from $DefaultTableName where doublecol > 5678912.345681")
-    assert(testResult.size == targetResult.size, s"$testnm failed on size")
+    assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
@@ -74,7 +74,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
 
   def compareResults(fetchResult: Array[Row], targetResult: Array[Row]) = {
     val res = {
-      for (rx <- 0 until targetResult.size)
+      for (rx <- targetResult.indices)
       yield compareWithTol(fetchResult(rx).toSeq, targetResult(rx).toSeq, s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
@@ -100,7 +100,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     val testResult = runSql(testQuery)
     val targetResult =
       runSql(s"SELECT strcol, bytecol, shortcol, intcol FROM $DefaultTableName ORDER BY strcol")
-    assert(testResult.size == targetResult.size, s"$testnm failed on size")
+    assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
 
@@ -125,7 +125,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
 
     val testQuery = "SELECT * FROM insertValuesTest ORDER BY strcol"
     val testResult = runSql(testQuery)
-    assert(testResult.size == 3, s"$testnm failed on size")
+    assert(testResult.length == 3, s"$testnm failed on size")
 
     val exparr = Array(Array("Row0", 'a', 12340, 23456780),
       Array("Row1", 'b', 12345, 23456789),
@@ -159,7 +159,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     val selectAllQuery = "SELECT * FROM insertNullValuesTest ORDER BY strcol"
     val selectAllResult = runSql(selectAllQuery)
 
-    assert(selectAllResult.size == 3, s"$testnm failed on size")
+    assert(selectAllResult.length == 3, s"$testnm failed on size")
 
     var currentResultRow: Int = 0
 
@@ -190,7 +190,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
 
     val selectWhereIsNotNullQuery = "SELECT * FROM insertNullValuesTest WHERE intcol IS NOT NULL ORDER BY strcol"
     val selectWhereIsNotNullResult = runSql(selectWhereIsNotNullQuery)
-    assert(selectWhereIsNotNullResult.size == 2, s"$testnm failed on size")
+    assert(selectWhereIsNotNullResult.length == 2, s"$testnm failed on size")
 
     currentResultRow = 0
     // check 1st result row

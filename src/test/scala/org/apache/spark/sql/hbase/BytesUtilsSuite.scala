@@ -32,7 +32,7 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
       .sortWith((f, s) =>
       HBaseBytesType.ordering.gt(
         f._2.asInstanceOf[HBaseBytesType.JvmType], s._2.asInstanceOf[HBaseBytesType.JvmType]))
-    assert(result.map(a => a._1).toSeq == s.sorted.reverse)
+    assert(result.map(a => a._1) == s.sorted.reverse)
   }
 
   def compare(a: Array[Byte], b: Array[Byte]): Int = {

@@ -46,18 +46,18 @@ class AggregateQueriesSuite extends HBaseTestData {
 
   def testGroupBy(testName: String, query: String) = {
     val result1 = runSql(query)
-    assert(result1.size == 2, s"$testName failed on size")
+    assert(result1.length == 2, s"$testName failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),
       Array(1, 23456782, 45657.82F, "Row2", 'b', 12342, 45657.82F, 5678912.345682, 3456789012342L))
 
     val res = {
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
 
-    logInfo(s"$query came back with ${result1.size} results")
+    logInfo(s"$query came back with $result1.length results")
     logInfo(result1.mkString)
 
     logInfo(s"Test $testName completed successfully")
@@ -74,18 +74,18 @@ class AggregateQueriesSuite extends HBaseTestData {
         .stripMargin
 
     val result1 = runSql(query1)
-    assert(result1.size == 2, s"$testnm failed on size")
+    assert(result1.length == 2, s"$testnm failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),
       Array(1, 23456782, 45657.82F, "Row2", 'b', 12342, 45657.82F, 5678912.345682, 3456789012342L))
 
     val res = {
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
 
-    logInfo(s"$query1 came back with ${result1.size} results")
+    logInfo(s"$query1 came back with $result1.length results")
     logInfo(result1.mkString)
 
     logInfo(s"Test $testnm completed successfully")

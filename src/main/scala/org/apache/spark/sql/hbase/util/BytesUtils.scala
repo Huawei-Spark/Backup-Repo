@@ -88,6 +88,19 @@ object BytesUtils {
   }
 
   /**
+   * append one to the byte array
+   * @param input the byte array
+   * @return the modified byte array
+   */
+  def addOneString(input: HBaseRawType): HBaseRawType = {
+    val len = input.length
+    val result = new HBaseRawType(len + 1)
+    Array.copy(input, 0, result, 0, len)
+    result(len) = 0x01
+    result
+  }
+
+  /**
    * add one to the unsigned byte array
    * @param input the unsigned byte array
    * @return null if the byte array is all 0xff, otherwise increase by 1
@@ -194,5 +207,18 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(6) = (input >> 8).asInstanceOf[Byte]
     buffer(7) = input.asInstanceOf[Byte]
     buffer
+  }
+
+  def toBytes(input: Any): HBaseRawType = {
+    input match {
+      case item: Boolean => toBytes(item)
+      case item: Byte => toBytes(item)
+      case item: Double => toBytes(item)
+      case item: Float => toBytes(item)
+      case item: Int => toBytes(item)
+      case item: Long => toBytes(item)
+      case item: Short => toBytes(item)
+      case item: String => toBytes(item)
+    }
   }
 }

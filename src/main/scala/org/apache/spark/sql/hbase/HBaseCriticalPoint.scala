@@ -58,14 +58,13 @@ case class CriticalPoint[T](value: T, ctype: CriticalPointType.CriticalPointType
  * @param startInclusive inclusive for the start
  * @param end the end of the range in native; None for an open end
  * @param endInclusive inclusive for the end
- * @param dimIndex the dimension index. For
  * @param dt the data type
  * @param pred the associated predicate
  * @tparam T the native data type of the critical point range
  *
  */
-private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boolean,
-                                           end: Option[T], endInclusive: Boolean, dimIndex: Int,
+private[hbase] class CriticalPointRange[+T](start: Option[T], startInclusive: Boolean,
+                                           end: Option[T], endInclusive: Boolean,
                                            dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt) {
   var nextDimCriticalPointRanges: Seq[CriticalPointRange[_]] = Nil
@@ -83,7 +82,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
     } else {
       prefix += ((start.get, dt))
       require(isPoint, "Internal Logical Error: point range expected")
-      nextDimCriticalPointRanges.map(_.flatten(prefix)).reduceLeft(_ ++ _)
+      nextDimCriticalPointRanges.map(_.flatten(prefix.clone())).reduceLeft(_ ++ _)
     }
   }
 
@@ -304,52 +303,48 @@ object RangeCriticalPoint {
         if (prev == null) {
           cp.ctype match {
             case CriticalPointType.lowInclusive =>
-              result += new CriticalPointRange[T](None, false, Some(cp.value), true,
-                dimIndex, cp.dt, null)
+              result += new CriticalPointRange[T](None, false, Some(cp.value), true, cp.dt, null)
             case CriticalPointType.upInclusive =>
-              result += new CriticalPointRange[T](None, false, Some(cp.value), false,
-                dimIndex, cp.dt, null)
+              result += new CriticalPointRange[T](None, false, Some(cp.value), false, cp.dt, null)
             case CriticalPointType.bothInclusive =>
-              result +=(new CriticalPointRange[T](None, false, Some(cp.value), false,
-                dimIndex, cp.dt, null),
-                new CriticalPointRange[T](Some(cp.value), true, Some(cp.value), true,
-                  dimIndex, cp.dt, null))
+              result +=(new CriticalPointRange[T](None, false, Some(cp.value), false, cp.dt, null),
+                new CriticalPointRange[T](Some(cp.value), true, Some(cp.value), true, cp.dt, null))
           }
         } else {
           (prev.ctype, cp.ctype) match {
             case (CriticalPointType.lowInclusive, CriticalPointType.lowInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), true,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.lowInclusive, CriticalPointType.upInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), false,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.lowInclusive, CriticalPointType.bothInclusive) =>
               result +=(new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), false,
-                dimIndex, cp.dt, null),
+                cp.dt, null),
                 new CriticalPointRange[T](Some(cp.value), true, Some(cp.value), true,
-                  dimIndex, cp.dt, null))
+                cp.dt, null))
             case (CriticalPointType.upInclusive, CriticalPointType.lowInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), true, Some(cp.value), true,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.upInclusive, CriticalPointType.upInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), true, Some(cp.value), false,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.upInclusive, CriticalPointType.bothInclusive) =>
               result +=(new CriticalPointRange[T](Some(prev.value), true, Some(cp.value), false,
-                dimIndex, cp.dt, null),
+                cp.dt, null),
                 new CriticalPointRange[T](Some(cp.value), true, Some(cp.value), true,
-                  dimIndex, cp.dt, null))
+                cp.dt, null))
             case (CriticalPointType.bothInclusive, CriticalPointType.lowInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), true,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.bothInclusive, CriticalPointType.upInclusive) =>
               result += new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), false,
-                dimIndex, cp.dt, null)
+                cp.dt, null)
             case (CriticalPointType.bothInclusive, CriticalPointType.bothInclusive) =>
               result +=(new CriticalPointRange[T](Some(prev.value), false, Some(cp.value), false,
-                dimIndex, cp.dt, null),
+                cp.dt, null),
                 new CriticalPointRange[T](Some(cp.value), true, Some(cp.value), true,
-                  dimIndex, cp.dt, null))
+                cp.dt, null))
           }
         }
         prev = cp
@@ -359,13 +354,13 @@ object RangeCriticalPoint {
           prev.ctype match {
             case CriticalPointType.lowInclusive =>
               new CriticalPointRange[T](Some(prev.value), false,
-                None, false, dimIndex, prev.dt, null)
+                None, false, prev.dt, null)
             case CriticalPointType.upInclusive =>
               new CriticalPointRange[T](Some(prev.value), true,
-                None, false, dimIndex, prev.dt, null)
+                None, false, prev.dt, null)
             case CriticalPointType.bothInclusive =>
               new CriticalPointRange[T](Some(prev.value), false,
-                None, false, dimIndex, prev.dt, null)
+                None, false, prev.dt, null)
           }
         }
       }
@@ -395,8 +390,7 @@ object RangeCriticalPoint {
               && end.isDefined
               && (start.get == numeric.plus(end.get, numeric.one))) {
               null
-            } else new CriticalPointRange[T](start, startInclusive, end, endInclusive,
-              dimIndex, r.dt, null)
+            } else new CriticalPointRange[T](start, startInclusive, end, endInclusive, r.dt, null)
           } else r
         }
         ).filter(r => r != null)
@@ -412,7 +406,7 @@ object RangeCriticalPoint {
    */
   private[hbase] def generateCriticalPointRanges(relation: HBaseRelation, pred: Option[Expression])
   : Seq[CriticalPointRange[_]] = {
-    if (!pred.isDefined) Nil
+    if (pred.isEmpty) Nil
     else {
       val predExpr = pred.get
       val predRefs = predExpr.references.toSeq

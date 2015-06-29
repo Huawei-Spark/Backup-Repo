@@ -89,7 +89,7 @@ private[hbase] trait HBaseStrategies {
       def findScanNode(physicalChild: SparkPlan): Option[HBaseSQLTableScan] = physicalChild match {
         case chd: HBaseSQLTableScan => Some(chd)
         case chd if chd.children.size != 1 => None
-        case chd => findScanNode(chd.children(0))
+        case chd => findScanNode(chd.children.head)
       }
 
       /**
@@ -106,7 +106,7 @@ private[hbase] trait HBaseStrategies {
         def divideRawType(rawType: HBaseRawType, key: KeyColumn)
         : (HBaseRawType, HBaseRawType) = key.dataType match {
           case dt: StringType => rawType.splitAt(rawType.indexWhere(_ == 0x00) + 1)
-          case dt if dt.defaultSize >= rawType.size => (rawType, Array())
+          case dt if dt.defaultSize >= rawType.length => (rawType, Array())
           case dt => rawType.splitAt(dt.defaultSize)
         }
 
@@ -155,7 +155,7 @@ private[hbase] trait HBaseStrategies {
             else if (keysForGroup.size == hbaseRelation.keyColumns.size) aggrForAll
             else {
               val partitionsAfterFilter = scanNode.result.partitions
-              val eachPartionApart = (0 to partitionsAfterFilter.size - 2).forall { case i =>
+              val eachPartionApart = (0 to partitionsAfterFilter.length - 2).forall { case i =>
                 val headEnd = partitionsAfterFilter(i).asInstanceOf[HBasePartition]
                   .end.get.asInstanceOf[HBaseRawType]
                 val tailStart = partitionsAfterFilter(i + 1).asInstanceOf[HBasePartition]

@@ -238,7 +238,7 @@ case class BulkLoadIntoTableCommand(
             }
 
             isEmptyRow = true
-            for (i <- 0 until kv._2.size) {
+            for (i <- kv._2.indices) {
               if (kv._2(i).nonEmpty) {
                 isEmptyRow = false
                 val nkc = relation.nonKeyColumns(i)

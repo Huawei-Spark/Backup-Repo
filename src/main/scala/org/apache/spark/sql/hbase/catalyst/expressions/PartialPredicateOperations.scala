@@ -21,6 +21,7 @@ import org.apache.spark.sql.catalyst.errors.TreeNodeException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.types._
+import org.apache.spark.sql.hbase.types.RangeType._
 
 object PartialPredicateOperations {
   // Partial reduction is nullness-based, i.e., uninterested columns are assigned nulls,
@@ -35,7 +36,8 @@ object PartialPredicateOperations {
       }
     }
 
-    def partialReduce(input: Row, schema: Seq[Attribute]): (Any, Expression) = {
+    def partialReduce(input: Row, schema: Seq[Attribute], checkNull: Boolean = false):
+      (Any, Expression) = {
       e match {
         case And(left, right) =>
           val l = left.partialReduce(input, schema)
@@ -118,7 +120,7 @@ object PartialPredicateOperations {
             }
             if (foundInList) {
               (true, null)
-            } else if (newList.size == 0) {
+            } else if (newList.isEmpty) {
               (false, null)
             } else {
               (null, In(expr, newList))
@@ -141,7 +143,7 @@ object PartialPredicateOperations {
             }
             if (foundInSet) {
               (true, null)
-            } else if (newHset.size == 0) {
+            } else if (newHset.isEmpty) {
               (false, null)
             } else {
               (null, InSet(evaluatedValue._2, newHset))
@@ -156,7 +158,24 @@ object PartialPredicateOperations {
         case n: NamedExpression =>
           val res = n.eval(input)
           (res, n)
-        case IsNull(child) => (null, unboundAttributeReference(e, schema))
+        case IsNull(child) => if (checkNull) {
+            if (child == null) {
+              (true, null)
+            } else {
+              (false, null)
+            }
+          } else {
+            (null, unboundAttributeReference(e, schema))
+          }
+        case IsNotNull(child) => if (checkNull) {
+            if (child == null) {
+              (false, null)
+            } else {
+              (true, null)
+            }
+          } else {
+            (null, unboundAttributeReference(e, schema))
+          }
         // TODO: CAST/Arithmetic could be treated more nicely
         case Cast(_, _) => (null, unboundAttributeReference(e, schema))
         // case BinaryArithmetic => null
@@ -207,7 +226,11 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get <= 0, null)
+              if (cmp.get == 1) {
+                (null, EqualTo(evalL._2, evalR._2))
+              } else {
+                (cmp.get <= 0, null)
+              }
             } else {
               (null, LessThanOrEqual(evalL._2, evalR._2))
             }
@@ -241,13 +264,17 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get >= 0, null)
+              if (cmp.get == -1) {
+                (null, EqualTo(evalL._2, evalR._2))
+              } else {
+                (cmp.get >= 0, null)
+              }
             } else {
               (null, GreaterThanOrEqual(evalL._2, evalR._2))
             }
           }
         case If(predicate, trueE, falseE) =>
-          val (v, expression) = predicate.partialReduce(input, schema)
+          val (v, _) = predicate.partialReduce(input, schema)
           if (v == null) {
             (null, unboundAttributeReference(e, schema))
           } else if (v.asInstanceOf[Boolean]) {
@@ -272,14 +299,10 @@ object PartialPredicateOperations {
 
       dataType1 match {
         case nativeType: NativeType =>
-          val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType, null)
-          if (pdt == null) {
-            sys.error(s"Type $i does not have corresponding partial ordered type")
-          } else {
-            pdt.partialOrdering.tryCompare(
-              pdt.toPartiallyOrderingDataType(eval1, nativeType).asInstanceOf[pdt.JvmType],
-              pdt.toPartiallyOrderingDataType(eval2, nativeType).asInstanceOf[pdt.JvmType])
-          }
+          val pdt: RangeType[nativeType.JvmType] = nativeType.toRangeType[nativeType.JvmType]
+          pdt.partialOrdering.tryCompare(
+            pdt.toPartiallyOrderingDataType(eval1, nativeType),
+            pdt.toPartiallyOrderingDataType(eval2, nativeType))
         case other => sys.error(s"Type $other does not support partially ordered operations")
       }
     }

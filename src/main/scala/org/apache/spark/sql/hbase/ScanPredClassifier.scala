@@ -90,7 +90,7 @@ class ScanPredClassifier(relation: HBaseRelation) {
       case GreaterThan(left, right) => classifyBinary(left, right, pred)
       case GreaterThanOrEqual(left, right) => classifyBinary(left, right, pred)
       case In(value@AttributeReference(_, _, _, _), list) =>
-        if (relation.isNonKey(value) && list.filter(!_.isInstanceOf[Literal]).isEmpty) {
+        if (relation.isNonKey(value) && !list.exists(!_.isInstanceOf[Literal])) {
           (Some(pred), None)
         } else {
           (None, Some(pred))

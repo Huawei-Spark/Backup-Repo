@@ -16,17 +16,15 @@
  */
 package org.apache.spark.sql.hbase.types
 
-import java.sql.Timestamp
-
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.ScalaReflectionLock
 import org.apache.spark.sql.types._
 
-import scala.collection.immutable.HashMap
+import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.math.PartialOrdering
 import scala.reflect.runtime.universe.typeTag
 
-class Range[T](val start: Option[T], // None for open ends
+class Range[+T](val start: Option[T], // None for open ends
                val startInclusive: Boolean,
                val end: Option[T], // None for open ends
                val endInclusive: Boolean,
@@ -40,42 +38,23 @@ class Range[T](val start: Option[T], // None for open ends
     startInclusive && endInclusive && start.get.equals(end.get)
 }
 
-/**
- * HBase partition range
- * @param start start position
- * @param startInclusive whether the start position is inclusive or not
- * @param end end position
- * @param endInclusive whether the end position is inclusive or not
- * @param id the partition id
- * @param dt the data type
- * @param pred the associated predicate
- * @tparam T template of the type
- */
-class PartitionRange[T](start: Option[T], startInclusive: Boolean,
-                        end: Option[T], endInclusive: Boolean,
-                        val id: Int, dt: NativeType, var pred: Expression)
-  extends Range[T](start, startInclusive, end, endInclusive, dt)
-
 private[hbase] class RangeType[T] extends PartialOrderingDataType {
   override def defaultSize: Int = 4096
   private[sql] type JvmType = Range[T]
-  // TODO: can not use ScalaReflectionLock now for its accessibility
-  // @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[JvmType] }
-  @transient private[sql] lazy val tag = synchronized(typeTag[JvmType])
-  
+  @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[JvmType] }
+
   private[spark] override def asNullable: RangeType[T] = this
 
-  def toPartiallyOrderingDataType(s: Any, dt: NativeType): Any = s match {
-    case b: Boolean => new Range[Boolean](Some(b), true, Some(b), true, BooleanType)
-    case b: Byte => new Range[Byte](Some(b), true, Some(b), true, ByteType)
-    case d: Double => new Range[Double](Some(d), true, Some(d), true, DoubleType)
-    case f: Float => new Range[Float](Some(f), true, Some(f), true, FloatType)
-    case i: Int => new Range[Int](Some(i), true, Some(i), true, IntegerType)
-    case l: Long => new Range[Long](Some(l), true, Some(l), true, LongType)
-    case s: Short => new Range[Short](Some(s), true, Some(s), true, ShortType)
-    case s: String => new Range[String](Some(s), true, Some(s), true, StringType)
-    case t: Timestamp => new Range[Timestamp](Some(t), true, Some(t), true, TimestampType)
-    case _ => s
+  /**
+   * Convert a value to a point range
+   * @param s value to be converted from
+   * @param dt runtime type
+   * @return
+   */
+  override def toPartiallyOrderingDataType(s: Any, dt: NativeType): JvmType = s match {
+    case r: JvmType => r
+    case _ =>
+      new Range(Some(s.asInstanceOf[T] ), true, Some(s.asInstanceOf[T] ), true, dt)
   }
 
   val partialOrdering = new PartialOrdering[JvmType] {
@@ -181,37 +160,12 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
 }
 
 object RangeType {
+  import scala.reflect.runtime.universe.TypeTag
+  private val typeMap = new mutable.HashMap[TypeTag[_], RangeType[_]]
+    with mutable.SynchronizedMap[TypeTag[_], RangeType[_]]
 
-  object BooleanRangeType extends RangeType[Boolean]
-
-  object ByteRangeType extends RangeType[Byte]
-
-  object DecimalRangeType extends RangeType[BigDecimal]
-
-  object DoubleRangeType extends RangeType[Double]
-
-  object FloatRangeType extends RangeType[Float]
-
-  object IntegerRangeType extends RangeType[Int]
-
-  object LongRangeType extends RangeType[Long]
-
-  object ShortRangeType extends RangeType[Short]
-
-  object StringRangeType extends RangeType[String]
-
-  object TimestampRangeType extends RangeType[Timestamp]
-
-  val primitiveToPODataTypeMap: HashMap[NativeType, PartialOrderingDataType] =
-    HashMap(
-      BooleanType -> BooleanRangeType,
-      ByteType -> ByteRangeType,
-      DoubleType -> DoubleRangeType,
-      FloatType -> FloatRangeType,
-      IntegerType -> IntegerRangeType,
-      LongType -> LongRangeType,
-      ShortType -> ShortRangeType,
-      StringType -> StringRangeType,
-      TimestampType -> TimestampRangeType
-    )
+  implicit class partialOrdering(dt: NativeType) {
+    private[sql] def toRangeType[T]: RangeType[T] =
+      typeMap.getOrElseUpdate(dt.tag, new RangeType[T]).asInstanceOf[RangeType[T]]
+  }
 }

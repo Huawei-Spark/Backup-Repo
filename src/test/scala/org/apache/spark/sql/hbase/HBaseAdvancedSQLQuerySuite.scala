@@ -28,7 +28,7 @@ class HBaseAdvancedSQLQuerySuite extends HBaseSplitTestData {
     val originalValue = TestHbase.conf.codegenEnabled
     setConf(SQLConf.CODEGEN_ENABLED, "true")
     val result = sql("SELECT col1 FROM ta GROUP BY col1").collect()
-    assert(result.size == 14, s"aggregation with codegen test failed on size")
+    assert(result.length == 14, s"aggregation with codegen test failed on size")
     setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
   }
 

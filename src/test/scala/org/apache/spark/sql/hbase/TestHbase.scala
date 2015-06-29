@@ -44,4 +44,9 @@ object TestHbase
     + s"${sparkContext.hadoopConfiguration.get("hbase.zookeeper.property.clientPort")}")
 
   @transient lazy val hbaseAdmin: HBaseAdmin = new HBaseAdmin(sparkContext.hadoopConfiguration)
+
+  // The following operation will initialize the HBaseCatalog.
+  // And it should be done after starting MiniHBaseCluster
+  catalog.deploySuccessfully_internal = Some(true)
+  catalog.pwdIsAccessible = true
 }

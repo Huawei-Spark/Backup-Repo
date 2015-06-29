@@ -159,7 +159,7 @@ class HBaseSQLQuerySuite extends HBaseSplitTestData {
   test("index into array") {
     checkAnswer(
       sql("SELECT dt, dt[0], dt[0] + dt[1], dt[0 + 1] FROM arrayData"),
-      arrayData.map(d => Row(d.dt, d.dt(0), d.dt(0) + d.dt(1), d.dt(1))).collect())
+      arrayData.map(d => Row(d.dt, d.dt.head, d.dt.head + d.dt(1), d.dt(1))).collect())
   }
 
   test("left semi greater than predicate") {
@@ -175,8 +175,8 @@ class HBaseSQLQuerySuite extends HBaseSplitTestData {
         "SELECT nestedData, nestedData[0][0], nestedData[0][0] + nestedData[0][1] FROM arrayData"),
       arrayData.map(d =>
         Row(d.nestedData,
-          d.nestedData(0)(0),
-          d.nestedData(0)(0) + d.nestedData(0)(1))).collect().toSeq)
+          d.nestedData.head.head,
+          d.nestedData.head.head + d.nestedData.head(1))).collect().toSeq)
   }
 
   test("agg") {
@@ -582,7 +582,7 @@ class HBaseSQLQuerySuite extends HBaseSplitTestData {
     val nonexistentKey = "nonexistent"
 
     // "set" itself returns all config variables currently specified in SQLConf.
-    assert(sql("SET").collect().size == 0)
+    assert(sql("SET").collect().length == 0)
 
     // "set key=val"
     sql(s"SET $testKey=$testVal")

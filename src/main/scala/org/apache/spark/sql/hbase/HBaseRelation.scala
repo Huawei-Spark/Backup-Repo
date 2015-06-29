@@ -17,8 +17,8 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase._
-import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.{HBaseConfiguration, _}
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
 import org.apache.log4j.Logger
@@ -27,13 +27,12 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations.partialPredicateReducer
 import org.apache.spark.sql.hbase.catalyst.NotPusher
-import org.apache.spark.sql.hbase.types.PartitionRange
-import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
-import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation}
-import org.apache.spark.sql.sources.{RelationProvider, InsertableRelation}
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.hbase.types.Range
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils, HBaseKVHelper, Util}
+import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, InsertableRelation, LogicalRelation, RelationProvider}
+import org.apache.spark.sql.types._
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -48,8 +47,6 @@ class HBaseSource extends RelationProvider {
 
     val tableName = parameters("tableName")
     val rawNamespace = parameters("namespace")
-    val namespace: Option[String] = if (rawNamespace == null || rawNamespace.isEmpty) None
-    else Some(rawNamespace)
     val hbaseTable = parameters("hbaseTableName")
     val colsSeq = parameters("colsSeq").split(",")
     val keyCols = parameters("keyCols").split(";")
@@ -93,7 +90,8 @@ private[hbase] case class HBaseRelation(
                                          tableName: String,
                                          hbaseNamespace: String,
                                          hbaseTableName: String,
-                                         allColumns: Seq[AbstractColumn])
+                                         allColumns: Seq[AbstractColumn],
+                                         deploySuccessfully: Option[Boolean])
                                        (@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
   @transient lazy val logger = Logger.getLogger(getClass.getName)
@@ -209,14 +207,14 @@ private[hbase] case class HBaseRelation(
         regionLocations.zipWithIndex.map {
           case p =>
             val start: Option[HBaseRawType] = {
-              if (p._1._1.getStartKey.length == 0) {
+              if (p._1._1.getStartKey.isEmpty) {
                 None
               } else {
                 Some(p._1._1.getStartKey)
               }
             }
             val end: Option[HBaseRawType] = {
-              if (p._1._1.getEndKey.length == 0) {
+              if (p._1._1.getEndKey.isEmpty) {
                 None
               } else {
                 Some(p._1._1.getEndKey)
@@ -239,7 +237,7 @@ private[hbase] case class HBaseRelation(
   val scannerFetchSize = context.conf.asInstanceOf[HBaseSQLConf].scannerFetchSize
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
-                                   index: Int): PartitionRange[_] = {
+                                   index: Int): Range[_] = {
     def getData(dt: NativeType,
                 bound: Option[HBaseRawType]): Option[Any] = {
       if (bound.isEmpty) {
@@ -261,7 +259,7 @@ private[hbase] case class HBaseRelation(
     val end = getData(dt, partition.end)
     val startInclusive = start.nonEmpty
     val endInclusive = end.nonEmpty && !isLastKeyIndex
-    new PartitionRange(start, startInclusive, end, endInclusive, partition.index, dt, pred)
+    new Range(start, startInclusive, end, endInclusive, dt)
   }
 
 
@@ -304,7 +302,7 @@ private[hbase] case class HBaseRelation(
       val startInclusive = cpr.lastRange.startInclusive
       val endInclusive = cpr.lastRange.endInclusive
       val keyType: NativeType = cpr.lastRange.dt
-      val predicate = if (cpr.lastRange.pred == null) None else Some(cpr.lastRange.pred)
+      val predicate = Option(cpr.lastRange.pred)
 
       val (pushable, nonPushable, pushablePred) = buildPushdownFilterList(predicate)
 
@@ -442,7 +440,7 @@ private[hbase] case class HBaseRelation(
           * it will create 2 filters, first RowFilter = 10 (PrefixComparator),
           * second, RowFilter < (10, 5) (PrefixComparator / Comparator)
           */
-          val prefixFilter = if (head.size > 0) {
+          val prefixFilter = if (head.nonEmpty) {
             val row = HBaseKVHelper.encodingRawKeyColumns(head)
             new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(row))
           } else {
@@ -573,70 +571,71 @@ private[hbase] case class HBaseRelation(
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
     if (pred.isEmpty) {
       None
-    }
-    val expression = pred.get
-    expression match {
-      case And(left, right) =>
-        val filters = new java.util.ArrayList[Filter]
-        if (left != null) {
-          val leftFilterList = buildFilterListFromPred(Some(left))
-          addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ALL)
-        }
-        if (right != null) {
-          val rightFilterList = buildFilterListFromPred(Some(right))
-          addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ALL)
-        }
-        Some(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
-      case Or(left, right) =>
-        val filters = new java.util.ArrayList[Filter]
-        if (left != null) {
-          val leftFilterList = buildFilterListFromPred(Some(left))
-          addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ONE)
-        }
-        if (right != null) {
-          val rightFilterList = buildFilterListFromPred(Some(right))
-          addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ONE)
-        }
-        Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
-      case InSet(value@AttributeReference(name, dataType, _, _), hset) =>
-        val column = nonKeyColumns.find(_.sqlName == name)
-        if (column.isDefined) {
-          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
-          for (item <- hset) {
-            val filter = new SingleColumnValueFilter(column.get.familyRaw,
-              column.get.qualifierRaw,
-              CompareFilter.CompareOp.EQUAL,
-              DataTypeUtils.getBinaryComparator(BytesUtils.create(dataType),
-                Literal(item, dataType)))
-            filterList.addFilter(filter)
+    } else {
+      val expression = pred.get
+      expression match {
+        case And(left, right) =>
+          val filters = new java.util.ArrayList[Filter]
+          if (left != null) {
+            val leftFilterList = buildFilterListFromPred(Some(left))
+            addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ALL)
           }
-          Some(filterList)
-        } else {
-          None
-        }
-      case GreaterThan(left: AttributeReference, right: Literal) =>
-        createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.GREATER)
-      case GreaterThan(left: Literal, right: AttributeReference) =>
-        createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.GREATER)
-      case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
-        createSingleColumnValueFilter(left, right,
-          CompareFilter.CompareOp.GREATER_OR_EQUAL)
-      case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
-        createSingleColumnValueFilter(right, left,
-          CompareFilter.CompareOp.GREATER_OR_EQUAL)
-      case EqualTo(left: AttributeReference, right: Literal) =>
-        createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.EQUAL)
-      case EqualTo(left: Literal, right: AttributeReference) =>
-        createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.EQUAL)
-      case LessThan(left: AttributeReference, right: Literal) =>
-        createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.LESS)
-      case LessThan(left: Literal, right: AttributeReference) =>
-        createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.LESS)
-      case LessThanOrEqual(left: AttributeReference, right: Literal) =>
-        createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.LESS_OR_EQUAL)
-      case LessThanOrEqual(left: Literal, right: AttributeReference) =>
-        createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.LESS_OR_EQUAL)
-      case _ => None
+          if (right != null) {
+            val rightFilterList = buildFilterListFromPred(Some(right))
+            addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ALL)
+          }
+          Some(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
+        case Or(left, right) =>
+          val filters = new java.util.ArrayList[Filter]
+          if (left != null) {
+            val leftFilterList = buildFilterListFromPred(Some(left))
+            addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ONE)
+          }
+          if (right != null) {
+            val rightFilterList = buildFilterListFromPred(Some(right))
+            addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ONE)
+          }
+          Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
+        case InSet(value@AttributeReference(name, dataType, _, _), hset) =>
+          val column = nonKeyColumns.find(_.sqlName == name)
+          if (column.isDefined) {
+            val filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
+            for (item <- hset) {
+              val filter = new SingleColumnValueFilter(column.get.familyRaw,
+                column.get.qualifierRaw,
+                CompareFilter.CompareOp.EQUAL,
+                DataTypeUtils.getBinaryComparator(BytesUtils.create(dataType),
+                  Literal(item, dataType)))
+              filterList.addFilter(filter)
+            }
+            Some(filterList)
+          } else {
+            None
+          }
+        case GreaterThan(left: AttributeReference, right: Literal) =>
+          createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.GREATER)
+        case GreaterThan(left: Literal, right: AttributeReference) =>
+          createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.GREATER)
+        case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
+          createSingleColumnValueFilter(left, right,
+            CompareFilter.CompareOp.GREATER_OR_EQUAL)
+        case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
+          createSingleColumnValueFilter(right, left,
+            CompareFilter.CompareOp.GREATER_OR_EQUAL)
+        case EqualTo(left: AttributeReference, right: Literal) =>
+          createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.EQUAL)
+        case EqualTo(left: Literal, right: AttributeReference) =>
+          createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.EQUAL)
+        case LessThan(left: AttributeReference, right: Literal) =>
+          createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.LESS)
+        case LessThan(left: Literal, right: AttributeReference) =>
+          createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.LESS)
+        case LessThanOrEqual(left: AttributeReference, right: Literal) =>
+          createSingleColumnValueFilter(left, right, CompareFilter.CompareOp.LESS_OR_EQUAL)
+        case LessThanOrEqual(left: Literal, right: AttributeReference) =>
+          createSingleColumnValueFilter(right, left, CompareFilter.CompareOp.LESS_OR_EQUAL)
+        case _ => None
+      }
     }
   }
 
@@ -709,19 +708,19 @@ private[hbase] case class HBaseRelation(
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     require(filters.size < 2, "Internal logical error: unexpected filter list size")
-    val filterPredicate = if (filters.isEmpty) None
-    else Some(filters(0))
+    val filterPredicate = filters.headOption
     new HBaseSQLReaderRDD(
       this,
       context.conf.codegenEnabled,
       requiredColumns,
+      deploySuccessfully,
       filterPredicate, // PartitionPred : Option[Expression]
-      None, // coprocSubPlan: SparkPlan
       context
     )
   }
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
+                predicate: Option[Expression],
                 filters: Option[FilterList], otherFilters: Option[Expression],
                 pushdownPreds: Seq[Expression],
                 projectionList: Seq[NamedExpression]): Scan = {
@@ -738,7 +737,7 @@ private[hbase] case class HBaseRelation(
     scan.setCaching(scannerFetchSize)
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projectionList)
+    addColumnFamiliesToScan(scan, filters, otherFilters, predicate, pushdownPreds, projectionList)
   }
 
   /**
@@ -752,18 +751,20 @@ private[hbase] case class HBaseRelation(
    */
   def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
                               otherFilters: Option[Expression],
+                              predicate: Option[Expression],
                               pushdownPreds: Seq[Expression],
                               projectionList: Seq[NamedExpression]): Scan = {
     var distinctProjectionList = projectionList.map(_.name)
+    var keyOnlyFilterPresent = false
     if (otherFilters.isDefined) {
       distinctProjectionList =
-        distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name))
+        distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name)).distinct
     }
     // filter out the key columns
     distinctProjectionList =
       distinctProjectionList.filterNot(p => keyColumns.exists(_.sqlName == p))
 
-    val finalFilters = if (distinctProjectionList.size == 0) {
+    var finalFilters = if (distinctProjectionList.isEmpty) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
         if (filters.get.getFilters.size() == 1) {
           filters.get.getFilters.get(0)
@@ -771,12 +772,8 @@ private[hbase] case class HBaseRelation(
           filters.get
         }
       } else {
-        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-        val left = new FirstKeyOnlyFilter
-        val right = new KeyOnlyFilter
-        filterList.addFilter(left)
-        filterList.addFilter(right)
-        filterList
+        keyOnlyFilterPresent = true
+        new FirstKeyOnlyFilter
       }
     } else {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
@@ -789,24 +786,74 @@ private[hbase] case class HBaseRelation(
         null
       }
     }
-    if (finalFilters != null) scan.setFilter(finalFilters)
 
-    if (pushdownPreds.nonEmpty) {
-      val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).
+    if (predicate.nonEmpty) {
+      val pred = predicate.get
+      val predRefs = pred.references.toSeq
+      val predicateNameSet = predRefs.map(_.name).
         filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
-      if (distinctProjectionList.toSet.subsetOf(pushdownNameSet)) {
+      val boundPred = BindReferences.bindReference(pred, predRefs)
+      val row = new GenericRow(predRefs.size)
+      val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
+      if (distinctProjectionList.toSet.subsetOf(predicateNameSet)) {
         // If the pushed down predicate is present and the projection is a subset of the columns
         // of the pushed filters, use the columns as projections
         // to avoid a full projection
-        distinctProjectionList = pushdownNameSet.toSeq.distinct
-        if (distinctProjectionList.size > 0 && distinctProjectionList.size < nonKeyColumns.size) {
-          distinctProjectionList.map {
+        distinctProjectionList = predicateNameSet.toSeq.distinct
+        val boundPred = BindReferences.bindReference(pred, predRefs)
+        val row = new GenericRow(predRefs.size)
+        val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
+        val (addColumn, nkcols) = prRes match {
+          case (false, _) => (true, distinctProjectionList)
+          case (true, _) => (false, null)
+          case (null, reducedPred) =>
+            val nkRefs = reducedPred.references.map(_.name).filterNot(
+              p => keyColumns.exists(_.sqlName == p))
+            if (nkRefs.isEmpty) {
+              // Only key-related predicate is present, add FirstKeyOnlyFilter
+              if (!keyOnlyFilterPresent) {
+                if (finalFilters == null) {
+                  finalFilters = new FirstKeyOnlyFilter
+                } else {
+                  val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+                  filterList.addFilter(new FirstKeyOnlyFilter)
+                  filterList.addFilter(finalFilters)
+                  finalFilters = filterList
+                }
+              }
+              (false, null)
+            } else {
+              (true, nkRefs.toSeq)
+            }
+        }
+        if (addColumn && nkcols.nonEmpty && nkcols.size < nonKeyColumns.size) {
+          nkcols.foreach {
             case p =>
               val nkc = nonKeyColumns.find(_.sqlName == p).get
               scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
           }
         }
       }
+    }
+
+    if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+      if (finalFilters != null) {
+        if (otherFilters.isDefined) {
+          // add custom filter to handle other filters part
+          val customFilter = new HBaseCustomFilter(this, otherFilters.get)
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(finalFilters)
+          filterList.addFilter(customFilter)
+          scan.setFilter(filterList)
+        } else {
+          scan.setFilter(finalFilters)
+        }
+      } else if (otherFilters.isDefined) {
+        val customFilter = new HBaseCustomFilter(this, otherFilters.get)
+        scan.setFilter(customFilter)
+      }
+    } else {
+      if (finalFilters != null) scan.setFilter(finalFilters)
     }
     scan
   }
@@ -816,11 +863,91 @@ private[hbase] case class HBaseRelation(
     // TODO: add columns to the Get
   }
 
+  def buildRowAfterCoprocessor(projections: Seq[(Attribute, Int)],
+                               result: Result,
+                               row: MutableRow): Row = {
+    for (i <- projections.indices) {
+      val kv: Cell = result.rawCells()(i)
+      val colValue: HBaseRawType = CellUtil.cloneValue(kv)
+      DataTypeUtils.setRowColumnFromHBaseRawType(
+        row, projections(i)._2, colValue, 0, colValue.length, projections(i)._1.dataType)
+      //      if (kv == null || kv.getValueLength == 0) {
+      //        DataTypeUtils.setRowColumnFromHBaseRawType(
+      //          row, projections(i)._2, null, 0, 0, projections(i)._1.dataType)
+      //      } else {
+      //        DataTypeUtils.setRowColumnFromHBaseRawType(
+      //          row, projections(i)._2, kv.getValueArray, kv.getValueOffset,
+      //          kv.getValueLength, projections(i)._1.dataType)
+      //      }
+    }
+    row
+  }
+
+  def buildRowInCoprocessor(projections: Seq[(Attribute, Int)],
+                            result: java.util.ArrayList[Cell],
+                            row: MutableRow): Row = {
+    def getColumnLatestCell(family: Array[Byte],
+                            qualifier: Array[Byte]): Cell = {
+      // 0 means equal, >0 means larger, <0 means smaller
+      def compareCellWithExpectedOne(cell: Cell): Int = {
+        val compare = Bytes.compareTo(
+          cell.getFamilyArray, cell.getFamilyOffset, cell.getFamilyLength,
+          family, 0, family.length)
+        if (compare != 0) compare
+        else {
+          Bytes.compareTo(
+            cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength,
+            qualifier, 0, qualifier.length)
+        }
+      }
+
+      def binarySearchTheArrayList(startIndex: Int, endIndex: Int): Cell = {
+        if (startIndex > endIndex) null
+        else {
+          val midIndex = (startIndex + endIndex) >>> 1
+          val cell = result.get(midIndex)
+          // 0 means equal, >0 means larger, <0 means smaller
+          compareCellWithExpectedOne(cell) match {
+            case 0 => cell
+            case i if i < 0 => binarySearchTheArrayList(midIndex + 1, endIndex)
+            case i if i > 0 => binarySearchTheArrayList(startIndex, midIndex - 1)
+          }
+        }
+      }
+
+      if (result == null || result.isEmpty) null
+      else {
+        binarySearchTheArrayList(0, result.length - 1)
+      }
+    }
+
+    lazy val rowKeys = HBaseKVHelper.decodingRawKeyColumns(
+      result.head.getRowArray, keyColumns, result.head.getRowOffset)
+    projections.foreach {
+      p =>
+        columnMap.get(p._1.name).get match {
+          case column: NonKeyColumn =>
+            val kv = getColumnLatestCell(column.familyRaw, column.qualifierRaw)
+            if (kv == null || kv.getValueLength == 0) {
+              DataTypeUtils.setRowColumnFromHBaseRawType(
+                row, p._2, null, 0, 0, column.dataType)
+            } else {
+              DataTypeUtils.setRowColumnFromHBaseRawType(
+                row, p._2, kv.getValueArray, kv.getValueOffset, kv.getValueLength, column.dataType)
+            }
+          case keyIndex: Int =>
+            val (start, length) = rowKeys(keyIndex)
+            DataTypeUtils.setRowColumnFromHBaseRawType(
+              row, p._2, result.head.getRowArray, start, length, keyColumns(keyIndex).dataType)
+        }
+    }
+    row
+  }
+
   def buildRow(projections: Seq[(Attribute, Int)],
                result: Result,
                row: MutableRow): Row = {
-    assert(projections.size == row.length, "Projection size and row size mismatched")
-    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
+    lazy val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach {
       p =>
         columnMap.get(p._1.name).get match {

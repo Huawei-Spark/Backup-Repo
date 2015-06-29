@@ -355,7 +355,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val splitKeys = Seq(4, 8, 12).map { x =>
       BytesUtils.create(IntegerType).toBytes(x)
     }
-    createNativeHbaseTable("presplit_table", Seq("cf1", "cf2"), splitKeys.toArray)
+    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf1", "cf2"), splitKeys.toArray)
 
     val sql1 =
       s"""CREATE TABLE testblk(col1 INT, col2 INT, col3 STRING, PRIMARY KEY(col1))
@@ -380,7 +380,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().length == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -391,7 +391,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val splitKeys = Seq(4, 8, 12).map { x =>
       BytesUtils.create(IntegerType).toBytes(x)
     }
-    createNativeHbaseTable("presplit_table", Seq("cf1", "cf2"), splitKeys.toArray)
+    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf1", "cf2"), splitKeys.toArray)
 
     val sql1 =
       s"""CREATE TABLE testblk(col1 INT, col2 INT, col3 STRING, PRIMARY KEY(col1))
@@ -416,7 +416,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().length == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -427,16 +427,25 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     aggregationTest()
   }
 
-  test("group test for presplit table with codegen") {
+  test("group test for presplit table without coprocessor") {
+    aggregationTest(false)
+  }
+
+  test("group test for presplit table with codegen and coprocessor") {
     val originalValue = TestHbase.conf.codegenEnabled
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
-
     aggregationTest()
-
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
   }
 
-  def aggregationTest() = {
+  test("group test for presplit table with codegen but without coprocessor") {
+    val originalValue = TestHbase.conf.codegenEnabled
+    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
+    aggregationTest(false)
+    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
+  }
+
+  def aggregationTest(withCoprocessor: Boolean = true) = {
     val types = Seq(IntegerType, StringType, IntegerType)
 
     def generateRowKey(keys: Array[Any], length: Int = -1) = {
@@ -453,7 +462,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       generateRowKey(Array(4096, "cc", 0), 7) ++ Array[Byte](0x00),
       generateRowKey(Array(4096, "cc", 1000))
     )
-    createNativeHbaseTable("presplit_table", Seq("cf"), splitKeys)
+    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf"), splitKeys, withCoprocessor)
 
     val sql1 =
       s"""CREATE TABLE testblk(col1 INT, col2 STRING, col3 INT, col4 STRING,
@@ -494,11 +503,11 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     checkResult(TestHbase.sql(sql), containExchange = false, 3)
 
     val result = runSql("select avg(col3) from testblk where col1 < 4096 group by col1")
-    assert(result.size == 3)
+    assert(result.length == 3)
     val exparr = Array(Array(1024.0), Array(0.0), Array(1024.0))
 
     val res = {
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
@@ -510,11 +519,12 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   
   def checkResult(df: DataFrame, containExchange:Boolean, size: Int) = {
     df.queryExecution.executedPlan match {
-      case a:org.apache.spark.sql.execution.Aggregate => 
+      case a:org.apache.spark.sql.execution.Aggregate =>
         assert(a.child.isInstanceOf[Exchange] == containExchange)
-      case a:org.apache.spark.sql.execution.GeneratedAggregate => 
+      case a:org.apache.spark.sql.execution.GeneratedAggregate =>
         assert(a.child.isInstanceOf[Exchange] == containExchange)
+      case _ => Nil
     }
-    assert(df.collect().size == size)
+    assert(df.collect().length == size)
   }
 }

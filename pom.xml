@@ -1187,6 +1187,15 @@
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
+    <resources>
+      <resource>
+        <directory>${basedir}/conf</directory>
+        <filtering>false</filtering>
+        <includes>
+          <include>hbase-site.xml</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <!-- Deploy datanucleus jars to the spark/lib_managed/jars directory -->
       <plugin>

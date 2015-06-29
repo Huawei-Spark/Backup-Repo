@@ -125,8 +125,8 @@ abstract class HBaseIntegrationTestBase
 
   def verify(testName: String, sql: String, result1: Seq[Seq[Any]], exparr: Seq[Seq[Any]]) = {
     val res = {
-      for (rx <- 0 until exparr.size)
-      yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
+      for (rx <- exparr.indices)
+      yield compareWithTol(result1(rx), exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
 
     logInfo(s"$sql came back with ${result1.size} results")

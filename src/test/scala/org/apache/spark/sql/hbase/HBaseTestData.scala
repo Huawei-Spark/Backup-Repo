@@ -1,9 +1,7 @@
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{TableExistsException, HColumnDescriptor, HTableDescriptor, TableName}
-import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 
 /*
@@ -70,19 +68,6 @@ class HBaseTestData extends HBaseIntegrationTestBase {
     }
   }
 
-  def createNativeHbaseTable(tableName: String, families: Seq[String],
-                             splitKeys: Array[HBaseRawType]) = {
-    val hbaseAdmin = TestHbase.hbaseAdmin
-    val hdesc = new HTableDescriptor(TableName.valueOf(tableName))
-    families.foreach { f => hdesc.addFamily(new HColumnDescriptor(f))}
-    try {
-      hbaseAdmin.createTable(hdesc, splitKeys)
-    } catch {
-      case e: TableExistsException =>
-        logError(s"Table already exists $tableName", e)
-    }
-  }
-
   def dropNativeHbaseTable(tableName: String) = {
     try {
       val hbaseAdmin = TestHbase.hbaseAdmin
@@ -94,11 +79,10 @@ class HBaseTestData extends HBaseIntegrationTestBase {
     }
   }
 
-  def createTables(
-      stagingTableName: String,
-      tableName: String,
-      hbaseStagingTable: String,
-      hbaseTable: String) = {
+  def createTables(stagingTableName: String,
+                   tableName: String,
+                   hbaseStagingTable: String,
+                   hbaseTable: String) = {
     val hbaseAdmin = TestHbase.hbaseAdmin
     if (!hbaseAdmin.tableExists(TableName.valueOf(hbaseStagingTable))) {
       createNativeHbaseTable(hbaseStagingTable, DefaultHbaseColFamilies)
@@ -162,10 +146,10 @@ class HBaseTestData extends HBaseIntegrationTestBase {
   def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
     val execQuery1 = sqlCtx.executeSql(sql)
     val result1 = runSql(sql)
-    assert(result1.size == exparr.length, s"$testName failed on size")
+    assert(result1.length == exparr.length, s"$testName failed on size")
     verify(testName,
       sql,
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield result1(rx).toSeq, exparr
     )
   }

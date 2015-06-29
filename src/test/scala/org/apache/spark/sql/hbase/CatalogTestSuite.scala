@@ -77,10 +77,10 @@ class CatalogTestSuite extends HBaseIntegrationTestBase {
     assert(result.allColumns.size === 4)
 
     // check the data type
-    assert(result.keyColumns(0).dataType === StringType)
+    assert(result.keyColumns.head.dataType === StringType)
     assert(result.keyColumns(1).dataType === IntegerType)
     assert(result.nonKeyColumns(1).dataType === FloatType)
-    assert(result.nonKeyColumns(0).dataType === BooleanType)
+    assert(result.nonKeyColumns.head.dataType === BooleanType)
 
     val relation = catalog.lookupRelation(Seq(tableName))
     val subquery = relation.asInstanceOf[Subquery]
