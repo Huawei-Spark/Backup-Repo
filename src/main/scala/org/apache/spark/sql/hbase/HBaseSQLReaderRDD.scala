@@ -42,6 +42,7 @@ object CoprocessorConstants {
 class HBasePostCoprocessorSQLReaderRDD(
                                         val relation: HBaseRelation,
                                         val codegenEnabled: Boolean,
+                                        val useCustomFilter: Boolean,
                                         val output: Seq[Attribute],
                                         @transient val filterPred: Option[Expression],
                                         val subplan: SparkPlan,
@@ -187,7 +188,7 @@ class HBasePostCoprocessorSQLReaderRDD(
         ListBuffer[Expression]()
       }
       val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
-        otherFilters, pushablePreds, output)
+        otherFilters, pushablePreds, useCustomFilter, output)
       setCoprocessor(scan, otherFilters, split.index)
       val scanner = relation.htable.getScanner(scan)
       createIterator(context, scanner, None)
@@ -276,10 +277,16 @@ class HBasePostCoprocessorSQLReaderRDD(
 
         val (filters, otherFilters, preds) =
           relation.buildCPRFilterList(output, predicate, expandedCPRs)
-        val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
+        val scan = relation.buildScan(start, end, predicate, filters,
+          otherFilters, preds, useCustomFilter, output)
         setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
-        createIterator(context, scanner, None)
+        if (useCustomFilter) {
+          // other filters will be evaluated as part of a custom filter
+          createIterator(context, scanner, None)
+        } else {
+          createIterator(context, scanner, otherFilters)
+        }
       }
     }
   }
@@ -291,6 +298,7 @@ class HBasePostCoprocessorSQLReaderRDD(
 class HBaseSQLReaderRDD(
                          val relation: HBaseRelation,
                          val codegenEnabled: Boolean,
+                         val useCustomFilter: Boolean,
                          val output: Seq[Attribute],
                          val deploySuccessfully: Option[Boolean],
                          @transient val filterPred: Option[Expression],
@@ -419,10 +427,10 @@ class HBaseSQLReaderRDD(
         ListBuffer[Expression]()
       }
       val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
-        otherFilters, pushablePreds, output)
+        otherFilters, pushablePreds, useCustomFilter, output)
       val scanner = relation.htable.getScanner(scan)
 
-      if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+      if (useCustomFilter && deploySuccessfully.isDefined && deploySuccessfully.get) {
         createIterator(context, scanner, None)
       } else {
         createIterator(context, scanner, otherFilters)
@@ -512,9 +520,11 @@ class HBaseSQLReaderRDD(
 
         val (filters, otherFilters, preds) =
           relation.buildCPRFilterList(output, predicate, expandedCPRs)
-        val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
+        val scan = relation.buildScan(start, end, predicate, filters,
+          otherFilters, preds, useCustomFilter, output)
         val scanner = relation.htable.getScanner(scan)
-        if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+        if (useCustomFilter && deploySuccessfully.isDefined && deploySuccessfully.get) {
+          // other filters will be evaluated as part of a custom filter
           createIterator(context, scanner, None)
         } else {
           createIterator(context, scanner, otherFilters)

@@ -27,11 +27,11 @@ II. Go to the root of the source tree
 ```
 III. Build
 ```
-    $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
+    $ mvn -Phbase,hadoop-2.4 -Dhadoop.version=2.4.0 -DskipTests clean package install
 ```
-IV. Run test suites against an HBase minicluster, from Maven.
+IV. Run test suites against a HBase minicluster, from Maven.
 ```
-    $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0  test
+    $ mvn -Phbase,hadoop-2.4 -Dhadoop.version=2.4.0 test
 ```
 
 ## Interactive Scala Shell

@@ -710,6 +710,7 @@ private[hbase] case class HBaseRelation(
     new HBaseSQLReaderRDD(
       this,
       context.conf.codegenEnabled,
+      context.conf.asInstanceOf[HBaseSQLConf].useCustomFilter,
       requiredColumns,
       deploySuccessfully,
       filterPredicate, // PartitionPred : Option[Expression]
@@ -721,6 +722,7 @@ private[hbase] case class HBaseRelation(
                 predicate: Option[Expression],
                 filters: Option[FilterList], otherFilters: Option[Expression],
                 pushdownPreds: Seq[Expression],
+                useCustomFilter: Boolean,
                 projectionList: Seq[NamedExpression]): Scan = {
     val scan = {
       (start, end) match {
@@ -735,7 +737,8 @@ private[hbase] case class HBaseRelation(
     scan.setCaching(scannerFetchSize)
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, predicate, pushdownPreds, projectionList)
+    addColumnFamiliesToScan(scan, filters, otherFilters,
+      predicate, pushdownPreds, useCustomFilter, projectionList)
   }
 
   /**
@@ -751,6 +754,7 @@ private[hbase] case class HBaseRelation(
                               otherFilters: Option[Expression],
                               predicate: Option[Expression],
                               pushdownPreds: Seq[Expression],
+                              useCustomFilter: Boolean,
                               projectionList: Seq[NamedExpression]): Scan = {
     var distinctProjectionList = projectionList.map(_.name)
     var keyOnlyFilterPresent = false
@@ -834,7 +838,7 @@ private[hbase] case class HBaseRelation(
       }
     }
 
-    if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+    if (deploySuccessfully.isDefined && deploySuccessfully.get && useCustomFilter) {
       if (finalFilters != null) {
         if (otherFilters.isDefined) {
           // add custom filter to handle other filters part

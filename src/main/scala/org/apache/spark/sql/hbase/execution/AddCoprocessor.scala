@@ -56,7 +56,9 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
 
     val oldRDD: HBaseSQLReaderRDD = oldScan.result.asInstanceOf[HBaseSQLReaderRDD]
     val newRDD = new HBasePostCoprocessorSQLReaderRDD(
-      oldRDD.relation, codegenEnabled, oldRDD.output,
+      oldRDD.relation, codegenEnabled,
+      oldRDD.useCustomFilter,
+      oldRDD.output,
       oldRDD.filterPred, newSubplan, sqlContext)
     val newScan = new HBaseSQLTableScan(oldRDD.relation, subplan.output, newRDD)
 
@@ -65,6 +67,9 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
   }
 
   def apply(plan: SparkPlan): SparkPlan = {
+    if (!sqlContext.conf.asInstanceOf[HBaseSQLConf].useCoprocessor) {
+      return plan
+    }
     var createSubplan: Boolean = false
     var createSubplanLeft: Boolean = false
     var path: List[SparkPlan] = List[SparkPlan]()
