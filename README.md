@@ -25,7 +25,7 @@ II. Go to the root of the source tree
 ```
     $ cd spark-hbase
 ```
-III. Build Spark-Huawei/hbase against it.
+III. Build
 ```
     $ mvn -e -T1C -Phbase,hadoop-2.4  -Dhadoop.version=2.4.0 -DskipTests    clean package install
 ```
