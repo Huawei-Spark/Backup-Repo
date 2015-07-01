@@ -49,7 +49,7 @@ private[hbase] trait HBaseStrategies {
             partial = true,
             groupingExpressions,
             aggregateExpressions,
-            false, //Todo
+            self.sqlContext.conf.unsafeEnabled,
             planLater(child)) :: Nil
           else execution.Aggregate(
             // In this case, 'partial = true' doesn't mean it is partial, actually, it is not.
