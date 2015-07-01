@@ -47,21 +47,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       hbaseTableName, allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
-    val llr = Literal(1023, IntegerType)
+    val llr = Literal.create(1023, IntegerType)
     val ll = GreaterThan(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(1025, IntegerType)
+    val lrr = Literal.create(1025, IntegerType)
     val lr = LessThan(lrl, lrr)
 
     val l = And(ll, lr)
 
     val rll = lll
-    val rlr = Literal(2048, IntegerType)
+    val rlr = Literal.create(2048, IntegerType)
     val rl = GreaterThanOrEqual(rll, rlr)
 
     val rrl = lll
-    val rrr = Literal(512, IntegerType)
+    val rrr = Literal.create(512, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -89,18 +89,18 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
-    val llr = Literal(1023L, LongType)
+    val llr = Literal.create(1023L, LongType)
     val ll = GreaterThan(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(1024L, LongType)
+    val lrr = Literal.create(1024L, LongType)
     val lr = LessThanOrEqual(lrl, lrr)
 
     val l_0 = And(ll, lr)
     val l = Not(l_0)
 
     val rll = lll
-    val rlr = Literal(512L, LongType)
+    val rlr = Literal.create(512L, LongType)
     val rl = LessThanOrEqual(rll, rlr)
 
     val r = Not(rl)
@@ -126,17 +126,17 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
-    val llr = Literal("aaa", StringType)
+    val llr = Literal.create("aaa", StringType)
     val ll = EqualTo(lll, llr)
 
     val lrl = lll
-    val lrr = Literal("bbb", StringType)
+    val lrr = Literal.create("bbb", StringType)
     val lr = EqualTo(lrl, lrr)
 
     val l = Or(ll, lr)
 
     val rl = lll
-    val rr = Literal("abc", StringType)
+    val rr = Literal.create("abc", StringType)
     val r = LessThanOrEqual(rl, rr)
 
     val mid = And(l, r)
@@ -161,21 +161,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column3").get
-    val llr = Literal(8.toShort, ShortType)
+    val llr = Literal.create(8.toShort, ShortType)
     val ll = GreaterThan(lll, llr)
 
     val lrl = relation.output.find(_.name == "column2").get
-    val lrr = Literal(2048, IntegerType)
+    val lrr = Literal.create(2048, IntegerType)
     val lr = EqualTo(lrl, lrr)
 
     val l = And(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal("abc", StringType)
+    val rlr = Literal.create("abc", StringType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = rll
-    val rrr = Literal("cba", StringType)
+    val rrr = Literal.create("cba", StringType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -186,7 +186,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(cprs.size == 2)
     assert(expandedCPRs.size == 2)
@@ -223,21 +223,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
-    val llr = Literal(8, IntegerType)
+    val llr = Literal.create(8, IntegerType)
     val ll = EqualTo(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(2048, IntegerType)
+    val lrr = Literal.create(2048, IntegerType)
     val lr = EqualTo(lrl, lrr)
 
     val l = Or(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal("abc", StringType)
+    val rlr = Literal.create("abc", StringType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = rll
-    val rrr = Literal("cba", StringType)
+    val rrr = Literal.create("cba", StringType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -248,7 +248,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(cprs.size == 2)
     assert(expandedCPRs.size == 4)
@@ -289,21 +289,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
-    val llr = Literal(8, IntegerType)
+    val llr = Literal.create(8, IntegerType)
     val ll = EqualTo(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(2048, IntegerType)
+    val lrr = Literal.create(2048, IntegerType)
     val lr = EqualTo(lrl, lrr)
 
     val l = Or(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal(32, IntegerType)
+    val rlr = Literal.create(32, IntegerType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = rll
-    val rrr = Literal(1024, IntegerType)
+    val rrr = Literal.create(1024, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -316,7 +316,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     assert(cprs.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
 
@@ -370,21 +370,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
-    val llr = Literal(8, IntegerType)
+    val llr = Literal.create(8, IntegerType)
     val ll = EqualTo(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(2048, IntegerType)
+    val lrr = Literal.create(2048, IntegerType)
     val lr = EqualTo(lrl, lrr)
 
     val l = Or(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal(32, IntegerType)
+    val rlr = Literal.create(32, IntegerType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = rll
-    val rrr = Literal(1024, IntegerType)
+    val rrr = Literal.create(1024, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -397,7 +397,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     assert(cprs.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
 
@@ -462,21 +462,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
-    val llr = Literal(8, IntegerType)
+    val llr = Literal.create(8, IntegerType)
     val ll = GreaterThan(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(256, IntegerType)
+    val lrr = Literal.create(256, IntegerType)
     val lr = LessThan(lrl, lrr)
 
     val l = And(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal(32, IntegerType)
+    val rlr = Literal.create(32, IntegerType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = rll
-    val rrr = Literal(64, IntegerType)
+    val rrr = Literal.create(64, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
     val r = Or(rl, rr)
@@ -489,7 +489,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     assert(cprs.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 2)
 
@@ -553,21 +553,21 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column3").get
-    val llr = Literal(32, IntegerType)
+    val llr = Literal.create(32, IntegerType)
     val ll = GreaterThan(lll, llr)
 
     val lrl = lll
-    val lrr = Literal(128, IntegerType)
+    val lrr = Literal.create(128, IntegerType)
     val lr = LessThan(lrl, lrr)
 
     val l = And(ll, lr)
 
     val rll = relation.output.find(_.name == "column1").get
-    val rlr = Literal(2, IntegerType)
+    val rlr = Literal.create(2, IntegerType)
     val rl = EqualTo(rll, rlr)
 
     val rrl = relation.output.find(_.name == "column2").get
-    val rrr = Literal(8, IntegerType)
+    val rrr = Literal.create(8, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
     val r = And(rl, rr)
@@ -580,7 +580,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     assert(cprs.size == 1)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 1)
 

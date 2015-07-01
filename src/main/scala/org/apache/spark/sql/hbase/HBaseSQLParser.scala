@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.execution._
+import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
 object HBaseSQLParser {
@@ -39,8 +40,6 @@ class HBaseSQLParser extends SqlParser {
 
   protected val ADD = Keyword("ADD")
   protected val ALTER = Keyword("ALTER")
-  protected val BOOLEAN = Keyword("BOOLEAN")
-  protected val BYTE = Keyword("BYTE")
   protected val COLS = Keyword("COLS")
   protected val CREATE = Keyword("CREATE")
   protected val DATA = Keyword("DATA")
@@ -48,38 +47,25 @@ class HBaseSQLParser extends SqlParser {
   protected val DROP = Keyword("DROP")
   protected val EXISTS = Keyword("EXISTS")
   protected val FIELDS = Keyword("FIELDS")
-  protected val FLOAT = Keyword("FLOAT")
   protected val INPATH = Keyword("INPATH")
-  protected val INTEGER = Keyword("INTEGER")
   protected val KEY = Keyword("KEY")
   protected val LOAD = Keyword("LOAD")
   protected val LOCAL = Keyword("LOCAL")
-  protected val LONG = Keyword("LONG")
   protected val MAPPED = Keyword("MAPPED")
   protected val PRIMARY = Keyword("PRIMARY")
   protected val PARALL = Keyword("PARALL")
-  protected val SHORT = Keyword("SHORT")
   protected val SHOW = Keyword("SHOW")
   protected val TABLES = Keyword("TABLES")
   protected val VALUES = Keyword("VALUES")
   protected val TERMINATED = Keyword("TERMINATED")
 
   override protected lazy val start: Parser[LogicalPlan] =
-    (select *
-      (UNION ~ ALL ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Union(q1, q2)}
-        | INTERSECT ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Intersect(q1, q2)}
-        | EXCEPT ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Except(q1, q2)}
-        | UNION ~ DISTINCT.? ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Distinct(Union(q1, q2))}
-        )
-      | insert | create | drop | alterDrop | alterAdd | load | show | describe
-      )
+    start1 | insert | cte |
+      create | drop | alterDrop | alterAdd |
+      insertValues | load | show | describe
 
-  override protected lazy val insert: Parser[LogicalPlan] =
-    (INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {
-      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)
-    }
-      |
-      INSERT ~> INTO ~> ident ~ (VALUES ~> "(" ~> values <~ ")") ^^ {
+  protected lazy val insertValues: Parser[LogicalPlan] =
+      INSERT ~> INTO ~> TABLE ~> ident ~ (VALUES ~> "(" ~> values <~ ")") ^^ {
         case tableName ~ valueSeq =>
           val valueStringSeq = valueSeq.map { case v =>
             if (v.value == null) null
@@ -87,7 +73,6 @@ class HBaseSQLParser extends SqlParser {
           }
           InsertValueIntoTableCommand(tableName, valueStringSeq)
       }
-      )
 
   protected lazy val create: Parser[LogicalPlan] =
     CREATE ~> TABLE ~> ident ~
@@ -243,9 +228,28 @@ class HBaseSQLParser extends SqlParser {
       case tableName => DescribeTableCommand(tableName)
     }
 
+  override protected lazy val primitiveType: Parser[DataType] =
+    "(?i)string".r ^^^ StringType |
+      "(?i)float".r ^^^ FloatType |
+      "(?i)(?:int|integer)".r ^^^ IntegerType |
+      "(?i)tinyint".r ^^^ ByteType |
+      "(?i)(?:short|smallint)".r ^^^ ShortType |
+      "(?i)double".r ^^^ DoubleType |
+      "(?i)(?:long|bigint)".r ^^^ LongType |
+      "(?i)binary".r ^^^ BinaryType |
+      "(?i)(?:bool|boolean)".r ^^^ BooleanType |
+      fixedDecimalType |
+      "(?i)decimal".r ^^^ DecimalType.Unlimited |
+      "(?i)date".r ^^^ DateType |
+      "(?i)timestamp".r ^^^ TimestampType |
+      varchar |
+      "(?i)byte".r ^^^ ByteType
+
   protected lazy val tableCol: Parser[(String, String)] =
-    ident ~ (STRING | BYTE | SHORT | INT | INTEGER | LONG | FLOAT | DOUBLE | BOOLEAN) ^^ {
-      case e1 ~ e2 => (e1, e2)
+    ident ~ primitiveType ^^ {
+      case e1 ~ e2 => {
+        (e1, e2.toString.dropRight(4).toUpperCase)
+      }
     }
 
   protected lazy val nameSpace: Parser[String] = ident <~ "."

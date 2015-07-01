@@ -159,8 +159,8 @@ object HBaseSQLCliDriver extends Logging {
                      |]
                      |[LIMIT number]""")
         case "INSERT" =>
-          println("INSERT INTO table_name SELECT clause")
-          println("INSERT INTO table_name VALUES (value, ...)")
+          println("INSERT INTO TABLE table_name SELECT clause")
+          println("INSERT INTO TABLE table_name VALUES (value, ...)")
         case "DESCRIBE" =>
           println("DESCRIBE table_name")
         case "SHOW" =>

@@ -27,37 +27,8 @@ import org.apache.hadoop.hbase.util.{Bytes, Writables}
 import org.apache.hadoop.io.Writable
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.util.{HBaseKVHelper, DataTypeUtils, BytesUtils}
-import org.apache.spark.sql.types.{DataType, NativeType, StringType}
+import org.apache.spark.sql.types.{DataType, AtomicType, StringType}
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-
-/**
- * the serializer to serialize / de-serialize the objects,
- * may use some serializer provided by Spark in the future.
- */
-private[hbase] object Serializer {
-  /**
-   * serialize the input object to byte array
-   * @param obj the input object
-   * @return the serialized byte array
-   */
-  def serialize(obj: Any): Array[Byte] = {
-    val b = new ByteArrayOutputStream()
-    val o = new ObjectOutputStream(b)
-    o.writeObject(obj)
-    b.toByteArray
-  }
-
-  /**
-   * de-serialize the byte array to the original object
-   * @param bytes the input byte array
-   * @return the de-serialized object
-   */
-  def deserialize(bytes: Array[Byte]): Any = {
-    val b = new ByteArrayInputStream(bytes)
-    val o = new ObjectInputStream(b)
-    o.readObject()
-  }
-}
 
 /**
  * The custom filter, it will skip the scan to the proper next position based on predicate
@@ -82,7 +53,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    *            then this is going to be the "full" range
    * @param children the children nodes for a non-leaf node; otherwise null
    */
-  private case class Node(dt: NativeType = null, dimension: Int = -1, parent: Node = null,
+  private case class Node(dt: AtomicType = null, dimension: Int = -1, parent: Node = null,
                            var currentChildIndex: Int = -1, var currentValue: Any = null,
                            var cpr: CriticalPointRange[Any] = null,
                            var children: Seq[Node] = null) {
@@ -148,14 +119,16 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     this.predExpr = predExpr
   }
 
+
+
   /**
    * convert the relation / predicate to byte array, used by framework
    * @param dataOutput the output to write
    */
   override def write(dataOutput: DataOutput) = {
-    val relationArray = Serializer.serialize(relation)
+    val relationArray = HBaseSerializer.serialize(relation)
     Bytes.writeByteArray(dataOutput, relationArray)
-    val predicateArray = Serializer.serialize(predExpr)
+    val predicateArray = HBaseSerializer.serialize(predExpr)
     Bytes.writeByteArray(dataOutput, predicateArray)
   }
 
@@ -165,9 +138,9 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    */
   override def readFields(dataInput: DataInput) = {
     val relationArray = Bytes.readByteArray(dataInput)
-    this.relation = Serializer.deserialize(relationArray).asInstanceOf[HBaseRelation]
+    this.relation = HBaseSerializer.deserialize(relationArray).asInstanceOf[HBaseRelation]
     val predicateArray = Bytes.readByteArray(dataInput)
-    this.predExpr = Serializer.deserialize(predicateArray).asInstanceOf[Expression]
+    this.predExpr = HBaseSerializer.deserialize(predicateArray).asInstanceOf[Expression]
     initialize()
   }
 
@@ -299,8 +272,8 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     if (children.isEmpty) {
       return (false, -1)
     }
-    val dt: NativeType = children.head.dt
-    type t = dt.JvmType
+    val dt: AtomicType = children.head.dt
+    type t = dt.InternalType
     val value = currentValues(node.dimension + 1)
 
     var low: Int = node.currentChildIndex
@@ -343,10 +316,10 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * @param cpr the critical point range to be tested
    * @return 0 within the range, -1 less than the range, 1 great than the range
    */
-  private def compareWithinRange[T](dt: NativeType, input: Any,
+  private def compareWithinRange[T](dt: AtomicType, input: Any,
                                     cpr: CriticalPointRange[T]): Int = {
     val ordering = dt.ordering
-    type t = dt.JvmType
+    type t = dt.InternalType
 
     val start = cpr.start
     val startInclusive = cpr.startInclusive
@@ -537,8 +510,8 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       return
     }
     val dimIndex = node.dimension + 1
-    val dt: NativeType = relation.keyColumns(dimIndex).dataType.asInstanceOf[NativeType]
-    type t = dt.JvmType
+    val dt: AtomicType = relation.keyColumns(dimIndex).dataType.asInstanceOf[AtomicType]
+    type t = dt.InternalType
 
     val keyDim = relation.partitionKeys(dimIndex)
     val predExpr = if (node.dimension == -1) {

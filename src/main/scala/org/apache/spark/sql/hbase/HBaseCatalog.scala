@@ -29,6 +29,7 @@ import org.apache.hadoop.hbase.{Coprocessor, HColumnDescriptor, HTableDescriptor
 import org.apache.log4j.Logger
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.catalyst.{SimpleCatalystConf, CatalystConf}
 import org.apache.spark.sql.catalyst.analysis.{Catalog, OverrideCatalog}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Subquery}
 import org.apache.spark.sql.hbase.HBaseCatalog._
@@ -451,6 +452,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
   override def unregisterTable(tableIdentifier: Seq[String]): Unit = {}
 
   override def unregisterAllTables(): Unit = {}
+
+  override val conf: CatalystConf =SimpleCatalystConf(caseSensitive)
 }
 
 object HBaseCatalog {

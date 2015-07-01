@@ -21,8 +21,8 @@ import org.apache.spark.sql.types._
 import scala.reflect.runtime.universe.TypeTag
 
 abstract class PartialOrderingDataType extends DataType {
-  private[sql] type JvmType
-  def toPartiallyOrderingDataType(s: Any, dt: NativeType): JvmType
-  @transient private[sql] val tag: TypeTag[JvmType]
-  private[sql] val partialOrdering: PartialOrdering[JvmType]
+  private[sql] type InternalType
+  def toPartiallyOrderingDataType(s: Any, dt: AtomicType): InternalType
+  @transient private[sql] val tag: TypeTag[InternalType]
+  private[sql] val partialOrdering: PartialOrdering[InternalType]
 }

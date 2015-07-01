@@ -34,8 +34,8 @@ object BytesUtils {
     }
   }
 
-  def toString(input: HBaseRawType, offset: Int, length: Int): String = {
-    Bytes.toString(input, offset, length)
+  def toString(input: HBaseRawType, offset: Int, length: Int): UTF8String = {
+    UTF8String(input.slice(offset, offset + length))
   }
 
   def toByte(input: HBaseRawType, offset: Int): Byte = {
@@ -96,7 +96,7 @@ object BytesUtils {
     val len = input.length
     val result = new HBaseRawType(len + 1)
     Array.copy(input, 0, result, 0, len)
-    result(len) = 0x01
+    result(len) = 0x01.asInstanceOf[Byte]
     result
   }
 
@@ -148,8 +148,8 @@ object BytesUtils {
 class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
   val dataType = dt
 
-  def toBytes(input: String): HBaseRawType = {
-    buffer = Bytes.toBytes(input)
+  def toBytes(input: UTF8String): HBaseRawType = {
+    buffer = input.getBytes
     buffer
   }
 
@@ -218,7 +218,8 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
       case item: Int => toBytes(item)
       case item: Long => toBytes(item)
       case item: Short => toBytes(item)
-      case item: String => toBytes(item)
+      case item: String => toBytes(UTF8String(item))
+      case item: UTF8String => toBytes(item)
     }
   }
 }

@@ -44,7 +44,7 @@ public class JavaAPISuite extends HBaseIntegrationTestBase implements Serializab
             "longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))" +
             " MAPPED BY (" + hb_staging_table + ", COLS=[bytecol=cf1.hbytecol, " +
             "shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])";
-    private final String insert_sql = "INSERT INTO " + staging_table + " VALUES (\"strcol\" , \"bytecol\" , \"shortcol\" , \"intcol\" ," +
+    private final String insert_sql = "INSERT INTO TABLE " + staging_table + " VALUES (\"strcol\" , \"bytecol\" , \"shortcol\" , \"intcol\" ," +
             "  \"longcol\" , \"floatcol\" , \"doublecol\")";
     private final String retrieve_sql = "SELECT * FROM " + staging_table;
 

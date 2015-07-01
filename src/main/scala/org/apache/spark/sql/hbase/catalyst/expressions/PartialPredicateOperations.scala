@@ -99,7 +99,7 @@ object PartialPredicateOperations {
           if (evaluatedValue == null) {
             val evaluatedList = list.map(e=>e.partialReduce(input, schema) match {
               case (null, e: Expression) => e
-              case (d, _)  => Literal(d, e.dataType)
+              case (d, _)  => Literal.create(d, e.dataType)
             })
             (null, In(expr, evaluatedList))
           } else {
@@ -298,8 +298,10 @@ object PartialPredicateOperations {
       }
 
       dataType1 match {
-        case nativeType: NativeType =>
-          val pdt: RangeType[nativeType.JvmType] = nativeType.toRangeType[nativeType.JvmType]
+        case nativeType: AtomicType =>
+          val pdt: RangeType[nativeType.InternalType] = {
+            nativeType.toRangeType[nativeType.InternalType]
+          }
           pdt.partialOrdering.tryCompare(
             pdt.toPartiallyOrderingDataType(eval1, nativeType),
             pdt.toPartiallyOrderingDataType(eval2, nativeType))

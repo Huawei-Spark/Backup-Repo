@@ -32,7 +32,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     runSql(createQuery)
 
     val insertQuery =
-      s"""INSERT INTO insertTestTable SELECT * FROM $DefaultTableName"""
+      s"""INSERT INTO TABLE insertTestTable SELECT * FROM $DefaultTableName"""
         .stripMargin
     runSql(insertQuery)
 
@@ -57,7 +57,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     runSql(createQuery)
 
     val insertQuery =
-      s"""insert into insertTestTableFilter select * from $DefaultTableName 
+      s"""insert into table insertTestTableFilter select * from $DefaultTableName
         where doublecol > 5678912.345681"""
         .stripMargin
     runSql(insertQuery)
@@ -90,7 +90,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
     runSql(createQuery)
 
     val insertQuery =
-      s"""INSERT INTO insertTestTableFewCols SELECT strcol, bytecol,
+      s"""INSERT INTO TABLE insertTestTableFewCols SELECT strcol, bytecol,
         shortcol, intcol FROM $DefaultTableName ORDER BY strcol"""
         .stripMargin
     runSql(insertQuery)
@@ -116,9 +116,9 @@ class HBaseInsertTableSuite extends HBaseTestData {
       .stripMargin
     runSql(createQuery)
 
-    val insertQuery1 = s"INSERT INTO insertValuesTest VALUES('Row0','a',12340,23456780)"
-    val insertQuery2 = s"INSERT INTO insertValuesTest VALUES('Row1','b',12345,23456789)"
-    val insertQuery3 = s"INSERT INTO insertValuesTest VALUES('Row2','c',12342,23456782)"
+    val insertQuery1 = s"INSERT INTO TABLE insertValuesTest VALUES('Row0','a',12340,23456780)"
+    val insertQuery2 = s"INSERT INTO TABLE insertValuesTest VALUES('Row1','b',12345,23456789)"
+    val insertQuery3 = s"INSERT INTO TABLE insertValuesTest VALUES('Row2','c',12342,23456782)"
     runSql(insertQuery1)
     runSql(insertQuery2)
     runSql(insertQuery3)
@@ -149,9 +149,9 @@ class HBaseInsertTableSuite extends HBaseTestData {
       .stripMargin
     runSql(createQuery)
 
-    val insertQuery1 = s"INSERT INTO insertNullValuesTest VALUES('Row0', null,  12340, 23456780)"
-    val insertQuery2 = s"INSERT INTO insertNullValuesTest VALUES('Row1', 'b',   null, 23456789)"
-    val insertQuery3 = s"INSERT INTO insertNullValuesTest VALUES('Row2', 'c',  12342, null)"
+    val insertQuery1 = s"INSERT INTO TABLE insertNullValuesTest VALUES('Row0', null,  12340, 23456780)"
+    val insertQuery2 = s"INSERT INTO TABLE insertNullValuesTest VALUES('Row1', 'b',   null, 23456789)"
+    val insertQuery3 = s"INSERT INTO TABLE insertNullValuesTest VALUES('Row2', 'c',  12342, null)"
     runSql(insertQuery1)
     runSql(insertQuery2)
     runSql(insertQuery3)

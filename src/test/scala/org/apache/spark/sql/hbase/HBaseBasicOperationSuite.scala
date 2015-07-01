@@ -43,7 +43,7 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
     )
 
     assert(sql( """SELECT * FROM tb0""").collect().length == 0)
-    sql( """INSERT INTO tb0 SELECT col4,col4,col6,col3 FROM ta""")
+    sql( """INSERT INTO TABLE tb0 SELECT col4,col4,col6,col3 FROM ta""")
     assert(sql( """SELECT * FROM tb0""").collect().length == 14)
 
     sql( """DROP TABLE tb0""")
@@ -56,8 +56,8 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
     )
 
     assert(sql( """SELECT * FROM tb1""").collect().length == 0)
-    sql( """INSERT INTO tb1 VALUES (1024, "abc")""")
-    sql( """INSERT INTO tb1 VALUES (1028, "abd")""")
+    sql( """INSERT INTO TABLE tb1 VALUES (1024, "abc")""")
+    sql( """INSERT INTO TABLE tb1 VALUES (1028, "abd")""")
     assert(sql( """SELECT * FROM tb1""").collect().length == 2)
     assert(
       sql( """SELECT * FROM tb1 WHERE (column1 = 1023 AND column2 ="abc")""").collect().length == 0)

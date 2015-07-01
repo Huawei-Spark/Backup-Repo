@@ -21,10 +21,11 @@ import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql._
-import org.apache.spark.sql.SparkSQLParser
+import org.apache.spark.sql.catalyst.{SqlParser, ParserDialect}
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
-import org.apache.spark.sql.execution.{AddExchange, SparkPlan}
+import org.apache.spark.sql.execution.{EnsureRequirements, SparkPlan}
 import org.apache.spark.sql.hbase.execution.{AddCoprocessor, HBaseStrategies}
 
 class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) {
@@ -34,10 +35,17 @@ class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) {
 
   protected[sql] override lazy val conf: SQLConf = new HBaseSQLConf
 
-  @transient
-  override protected[sql] val sqlParser = {
-    val fallback = new HBaseSQLParser
-    new SparkSQLParser(fallback(_))
+//  @transient
+//  override protected[sql] val sqlParser = {
+//    super.sqlParser
+//    val fallback = new HBaseSQLParser
+//    new SparkSQLParser(fallback.parse(_))
+//  }
+
+  override protected[sql] def dialectClassName = if (conf.dialect == "sql") {
+    classOf[HBaseParserDialect].getCanonicalName
+  } else {
+    conf.dialect
   }
 
   HBaseConfiguration.merge(
@@ -51,8 +59,17 @@ class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) {
 
   @transient
   override protected[sql] val prepareForExecution = new RuleExecutor[SparkPlan] {
-    val batches = Batch("Add exchange", Once, AddExchange(self)) ::
+    val batches = Batch("Add exchange", Once, EnsureRequirements(self)) ::
       Batch("Add coprocessor", Once, AddCoprocessor(self)) ::
       Nil
+  }
+}
+
+private[spark] class HBaseParserDialect extends ParserDialect {
+  @transient
+  protected val sqlParser = new HBaseSQLParser
+
+  override def parse(sqlText: String): LogicalPlan = {
+    sqlParser.parse(sqlText)
   }
 }

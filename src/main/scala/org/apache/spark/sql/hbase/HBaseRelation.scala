@@ -238,8 +238,7 @@ private[hbase] case class HBaseRelation(
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
                                    index: Int): Range[_] = {
-    def getData(dt: NativeType,
-                bound: Option[HBaseRawType]): Option[Any] = {
+    def getData(dt: AtomicType, bound: Option[HBaseRawType]): Option[Any] = {
       if (bound.isEmpty) {
         None
       } else {
@@ -249,11 +248,11 @@ private[hbase] case class HBaseRelation(
          */
         val finalRowKey = getFinalKey(bound)
         val (start, length) = HBaseKVHelper.decodingRawKeyColumns(finalRowKey, keyColumns)(index)
-        Some(DataTypeUtils.bytesToData(finalRowKey, start, length, dt).asInstanceOf[dt.JvmType])
+        Some(DataTypeUtils.bytesToData(finalRowKey, start, length, dt).asInstanceOf[dt.InternalType])
       }
     }
 
-    val dt = keyColumns(index).dataType.asInstanceOf[NativeType]
+    val dt = keyColumns(index).dataType.asInstanceOf[AtomicType]
     val isLastKeyIndex = index == (keyColumns.size - 1)
     val start = getData(dt, partition.start)
     val end = getData(dt, partition.end)
@@ -301,13 +300,12 @@ private[hbase] case class HBaseRelation(
       val endKey: Option[Any] = cpr.lastRange.end
       val startInclusive = cpr.lastRange.startInclusive
       val endInclusive = cpr.lastRange.endInclusive
-      val keyType: NativeType = cpr.lastRange.dt
+      val keyType: AtomicType = cpr.lastRange.dt
       val predicate = Option(cpr.lastRange.pred)
-
       val (pushable, nonPushable, pushablePred) = buildPushdownFilterList(predicate)
 
-      val items: Seq[(Any, NativeType)] = cpr.prefix
-      val head: Seq[(HBaseRawType, NativeType)] = items.map {
+      val items: Seq[(Any, AtomicType)] = cpr.prefix
+      val head: Seq[(HBaseRawType, AtomicType)] = items.map {
         case (itemValue, itemType) =>
           (DataTypeUtils.dataToBytes(itemValue, itemType), itemType)
       }
@@ -316,7 +314,7 @@ private[hbase] case class HBaseRelation(
         val keyCol = keyColumns.find(_.order == index).get
 
         val left = filterPred.get.references.find(_.name == keyCol.sqlName).get
-        val right = Literal(item._1, item._2)
+        val right = Literal.create(item._1, item._2)
         EqualTo(left, right)
       }
 
@@ -327,16 +325,16 @@ private[hbase] case class HBaseRelation(
         val startInclusive = cpr.lastRange.startInclusive
         val endInclusive = cpr.lastRange.endInclusive
         if (cpr.lastRange.isPoint) {
-          val right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          val right = Literal.create(cpr.lastRange.start.get, cpr.lastRange.dt)
           EqualTo(left, right)
         } else if (cpr.lastRange.start.isDefined && cpr.lastRange.end.isDefined) {
-          var right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          var right = Literal.create(cpr.lastRange.start.get, cpr.lastRange.dt)
           val leftExpression = if (startInclusive) {
             GreaterThanOrEqual(left, right)
           } else {
             GreaterThan(left, right)
           }
-          right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
+          right = Literal.create(cpr.lastRange.end.get, cpr.lastRange.dt)
           val rightExpress = if (endInclusive) {
             LessThanOrEqual(left, right)
           } else {
@@ -344,14 +342,14 @@ private[hbase] case class HBaseRelation(
           }
           And(leftExpression, rightExpress)
         } else if (cpr.lastRange.start.isDefined) {
-          val right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          val right = Literal.create(cpr.lastRange.start.get, cpr.lastRange.dt)
           if (startInclusive) {
             GreaterThanOrEqual(left, right)
           } else {
             GreaterThan(left, right)
           }
         } else if (cpr.lastRange.end.isDefined) {
-          val right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
+          val right = Literal.create(cpr.lastRange.end.get, cpr.lastRange.dt)
           if (endInclusive) {
             LessThanOrEqual(left, right)
           } else {
@@ -375,7 +373,7 @@ private[hbase] case class HBaseRelation(
       val filter = {
         if (cpr.lastRange.isPoint) {
           // the last range is a point
-          val tail: (HBaseRawType, NativeType) =
+          val tail: (HBaseRawType, AtomicType) =
             (DataTypeUtils.dataToBytes(startKey.get, keyType), keyType)
           val rowKeys = head :+ tail
           val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
@@ -389,7 +387,7 @@ private[hbase] case class HBaseRelation(
         } else {
           // the last range is not a point
           val startFilter: RowFilter = if (startKey.isDefined) {
-            val tail: (HBaseRawType, NativeType) =
+            val tail: (HBaseRawType, AtomicType) =
               (DataTypeUtils.dataToBytes(startKey.get, keyType), keyType)
             val rowKeys = head :+ tail
             val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
@@ -413,7 +411,7 @@ private[hbase] case class HBaseRelation(
             null
           }
           val endFilter: RowFilter = if (endKey.isDefined) {
-            val tail: (HBaseRawType, NativeType) =
+            val tail: (HBaseRawType, AtomicType) =
               (DataTypeUtils.dataToBytes(endKey.get, keyType), keyType)
             val rowKeys = head :+ tail
             val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
@@ -605,7 +603,7 @@ private[hbase] case class HBaseRelation(
                 column.get.qualifierRaw,
                 CompareFilter.CompareOp.EQUAL,
                 DataTypeUtils.getBinaryComparator(BytesUtils.create(dataType),
-                  Literal(item, dataType)))
+                  Literal.create(item, dataType)))
               filterList.addFilter(filter)
             }
             Some(filterList)
@@ -1004,7 +1002,7 @@ private[hbase] case class HBaseRelation(
           }
         } else {
           val nextRowIndex = rowIndex +
-            typeOfKey.dataType.asInstanceOf[NativeType].defaultSize
+            typeOfKey.dataType.asInstanceOf[AtomicType].defaultSize
           if (nextRowIndex <= origRowKey.length) {
             getFinalRowKey(nextRowIndex, curKeyIndex + 1)
           } else {
@@ -1026,7 +1024,7 @@ private[hbase] case class HBaseRelation(
       keyColumns.drop(startKeyIndex).map(k => {
         k.dataType match {
           case StringType => 1
-          case _ => k.dataType.asInstanceOf[NativeType].defaultSize
+          case _ => k.dataType.asInstanceOf[AtomicType].defaultSize
         }
       }
       ).sum

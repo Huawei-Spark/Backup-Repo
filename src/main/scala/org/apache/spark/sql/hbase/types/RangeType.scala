@@ -28,11 +28,11 @@ class Range[+T](val start: Option[T], // None for open ends
                val startInclusive: Boolean,
                val end: Option[T], // None for open ends
                val endInclusive: Boolean,
-               val dt: NativeType) extends Serializable {
+               val dt: AtomicType) extends Serializable {
   require(dt != null && !(start.isDefined && end.isDefined &&
     ((dt.ordering.eq(start.get, end.get) &&
       (!startInclusive || !endInclusive)) ||
-      dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType]))),
+      dt.ordering.gt(start.get.asInstanceOf[dt.InternalType], end.get.asInstanceOf[dt.InternalType]))),
     "Inappropriate range parameters")
   @transient lazy val isPoint: Boolean = start.isDefined && end.isDefined &&
     startInclusive && endInclusive && start.get.equals(end.get)
@@ -40,8 +40,8 @@ class Range[+T](val start: Option[T], // None for open ends
 
 private[hbase] class RangeType[T] extends PartialOrderingDataType {
   override def defaultSize: Int = 4096
-  private[sql] type JvmType = Range[T]
-  @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[JvmType] }
+  private[sql] type InternalType = Range[T]
+  @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[InternalType] }
 
   private[spark] override def asNullable: RangeType[T] = this
 
@@ -51,26 +51,26 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
    * @param dt runtime type
    * @return
    */
-  override def toPartiallyOrderingDataType(s: Any, dt: NativeType): JvmType = s match {
-    case r: JvmType => r
+  override def toPartiallyOrderingDataType(s: Any, dt: AtomicType): InternalType = s match {
+    case r: InternalType => r
     case _ =>
       new Range(Some(s.asInstanceOf[T] ), true, Some(s.asInstanceOf[T] ), true, dt)
   }
 
-  val partialOrdering = new PartialOrdering[JvmType] {
+  val partialOrdering = new PartialOrdering[InternalType] {
     // Right now we just support comparisons between a range and a point
     // In the future when more generic range comparisons, these two methods
     // must be functional as expected
     // return -2 if a < b; -1 if a <= b; 0 if a = b; 1 if a >= b; 2 if a > b
-    def tryCompare(a: JvmType, b: JvmType): Option[Int] = {
+    def tryCompare(a: InternalType, b: InternalType): Option[Int] = {
       val aRange = a.asInstanceOf[Range[T]]
       val aStartInclusive = aRange.startInclusive
-      val aStart = aRange.start.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
-      val aEnd = aRange.end.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val aStart = aRange.start.getOrElse(null).asInstanceOf[aRange.dt.InternalType]
+      val aEnd = aRange.end.getOrElse(null).asInstanceOf[aRange.dt.InternalType]
       val aEndInclusive = aRange.endInclusive
       val bRange = b.asInstanceOf[Range[T]]
-      val bStart = bRange.start.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
-      val bEnd = bRange.end.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val bStart = bRange.start.getOrElse(null).asInstanceOf[aRange.dt.InternalType]
+      val bEnd = bRange.end.getOrElse(null).asInstanceOf[aRange.dt.InternalType]
       val bStartInclusive = bRange.startInclusive
       val bEndInclusive = bRange.endInclusive
 
@@ -102,7 +102,7 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
       }
     }
 
-    def lteq(a: JvmType, b: JvmType): Boolean = {
+    def lteq(a: InternalType, b: InternalType): Boolean = {
       // [(aStart, aEnd)] and [(bStart, bEnd)]
       // [( and )] mean the possibilities of the inclusive and exclusive condition
       val aRange = a.asInstanceOf[Range[T]]
@@ -121,24 +121,24 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
         (aStartInclusive, aEndInclusive, bStartInclusive, bEndInclusive) match {
           // [(aStart, aEnd] compare to [bStart, bEnd)]
           case (_, true, true, _) =>
-            if (aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
-              bStart.asInstanceOf[aRange.dt.JvmType])) {
+            if (aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.InternalType],
+              bStart.asInstanceOf[aRange.dt.InternalType])) {
               true
             } else {
               false
             }
           // [(aStart, aEnd] compare to (bStart, bEnd)]
           case (_, true, false, _) =>
-            if (bStart != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
-              bStart.asInstanceOf[aRange.dt.JvmType])) {
+            if (bStart != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.InternalType],
+              bStart.asInstanceOf[aRange.dt.InternalType])) {
               true
             } else {
               false
             }
           // [(aStart, aEnd) compare to [bStart, bEnd)]
           case (_, false, true, _) =>
-            if (aEnd != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
-              bStart.asInstanceOf[aRange.dt.JvmType])) {
+            if (aEnd != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.InternalType],
+              bStart.asInstanceOf[aRange.dt.InternalType])) {
               true
             } else {
               false
@@ -146,8 +146,8 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
           // [(aStart, aEnd) compare to (bStart, bEnd)]
           case (_, false, false, _) =>
             if (aEnd != null && bStart != null &&
-              aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
-                bStart.asInstanceOf[aRange.dt.JvmType])) {
+              aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.InternalType],
+                bStart.asInstanceOf[aRange.dt.InternalType])) {
               true
             } else {
               false
@@ -164,7 +164,7 @@ object RangeType {
   private val typeMap = new mutable.HashMap[TypeTag[_], RangeType[_]]
     with mutable.SynchronizedMap[TypeTag[_], RangeType[_]]
 
-  implicit class partialOrdering(dt: NativeType) {
+  implicit class partialOrdering(dt: AtomicType) {
     private[sql] def toRangeType[T]: RangeType[T] =
       typeMap.getOrElseUpdate(dt.tag, new RangeType[T]).asInstanceOf[RangeType[T]]
   }

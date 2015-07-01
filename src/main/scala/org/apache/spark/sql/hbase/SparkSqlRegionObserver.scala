@@ -28,12 +28,9 @@ import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GeneratePredicate
-import org.apache.spark.sql.execution.SparkSqlSerializer
-import org.apache.spark.sql.hbase.util.{DataTypeUtils, BytesUtils}
+import org.apache.spark.sql.hbase.util.DataTypeUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SQLContext}
-
-import scala.collection.JavaConversions._
 
 /**
  * HBaseCoprocessorSQLReaderRDD:
@@ -54,9 +51,9 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
           null
         } else {
           if (codegenEnabled) {
-            GeneratePredicate(otherFilters.get, finalOutput)
+            GeneratePredicate.generate(otherFilters.get, finalOutput)
           } else {
-            InterpretedPredicate(otherFilters.get, finalOutput)
+            InterpretedPredicate.create(otherFilters.get, finalOutput)
           }
         }
       } else null
@@ -150,11 +147,11 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
       logger.debug("Work with coprocessor")
       val partitionIndex: Int = Bytes.toInt(serializedPartitionIndex)
       val serializedOutputDataType = scan.getAttribute(CoprocessorConstants.COTYPE)
-      val outputDataType: Seq[DataType] = SparkSqlSerializer
-        .deserialize[Seq[DataType]](serializedOutputDataType)
+      val outputDataType: Seq[DataType] =
+        HBaseSerializer.deserialize(serializedOutputDataType).asInstanceOf[Seq[DataType]]
 
       val serializedRDD = scan.getAttribute(CoprocessorConstants.COKEY)
-      val subPlanRDD: RDD[Row] = SparkSqlSerializer.deserialize[RDD[Row]](serializedRDD)
+      val subPlanRDD: RDD[Row] = HBaseSerializer.deserialize(serializedRDD).asInstanceOf[RDD[Row]]
 
       val regionInfo = s.getRegionInfo
       val startKey = if (regionInfo.getStartKey.isEmpty) None else Some(regionInfo.getStartKey)
@@ -162,7 +159,7 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
 
       val result = subPlanRDD.compute(
         new HBasePartition(partitionIndex, partitionIndex, startKey, endKey, newScanner = s),
-        new TaskContextImpl(0, 0, 0L, 0, false, new TaskMetrics))
+        new TaskContextImpl(0, 0, 0L, 0, null, false, new TaskMetrics))
 
       new BaseRegionScanner() {
         override def getRegionInfo: HRegionInfo = regionInfo
