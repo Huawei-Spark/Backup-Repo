@@ -68,8 +68,8 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
         KeyColumn("col3", StringType, 2), KeyColumn("col4", IntegerType, 3)))
 
     assert(BytesUtils.toDouble(rowkey, keys.head._1) === 123.456)
-    assert(BytesUtils.toString(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
-    assert(BytesUtils.toString(rowkey, keys(2)._1, keys(2)._2) === "")
+    assert(BytesUtils.toUTF8String(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
+    assert(BytesUtils.toUTF8String(rowkey, keys(2)._1, keys(2)._2) === "")
     assert(BytesUtils.toInt(rowkey, keys(3)._1) === 1234)
   }
 
@@ -87,7 +87,7 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
         KeyColumn("col3", IntegerType, 2)))
 
     assert(BytesUtils.toDouble(rowkey, keys.head._1) === 123.456)
-    assert(BytesUtils.toString(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
+    assert(BytesUtils.toUTF8String(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
     assert(BytesUtils.toInt(rowkey, keys(2)._1) === 1234)
   }
 

@@ -79,9 +79,9 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
     assert(BytesUtils.toShort(BytesUtils.create(ShortType)
       .toBytes(-12.asInstanceOf[Short]), 0) === -12)
 
-    assert(BytesUtils.toString(BytesUtils.create(StringType).toBytes("abc"), 0, 3)
+    assert(BytesUtils.toUTF8String(BytesUtils.create(StringType).toBytes("abc"), 0, 3)
       === UTF8String("abc"))
-    assert(BytesUtils.toString(BytesUtils.create(StringType).toBytes(""), 0, 0) === UTF8String(""))
+    assert(BytesUtils.toUTF8String(BytesUtils.create(StringType).toBytes(""), 0, 0) === UTF8String(""))
 
     assert(BytesUtils.toByte(BytesUtils.create(ByteType)
       .toBytes(5.asInstanceOf[Byte]), 0) === 5)

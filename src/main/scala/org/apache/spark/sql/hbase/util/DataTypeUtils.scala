@@ -43,7 +43,7 @@ object DataTypeUtils {
       case IntegerType => BytesUtils.toInt(src, offset)
       case LongType => BytesUtils.toLong(src, offset)
       case ShortType => BytesUtils.toShort(src, offset)
-      case StringType => BytesUtils.toString(src, offset, length)
+      case StringType => BytesUtils.toUTF8String(src, offset, length)
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -66,7 +66,7 @@ object DataTypeUtils {
       case IntegerType => bu.toBytes(src.asInstanceOf[Int])
       case LongType => bu.toBytes(src.asInstanceOf[Long])
       case ShortType => bu.toBytes(src.asInstanceOf[Short])
-      case StringType => bu.toBytes(src.toString)
+      case StringType => bu.toBytes(src)
       case _ => SparkSqlSerializer.serialize[Any](src) //TODO
     }
   }
@@ -98,7 +98,7 @@ object DataTypeUtils {
       case IntegerType => row.setInt(index, BytesUtils.toInt(src, offset))
       case LongType => row.setLong(index, BytesUtils.toLong(src, offset))
       case ShortType => row.setShort(index, BytesUtils.toShort(src, offset))
-      case StringType => row.update(index, BytesUtils.toString(src, offset, length))
+      case StringType => row.update(index, BytesUtils.toUTF8String(src, offset, length))
       case _ => row.update(index, SparkSqlSerializer.deserialize[Any](src)) //TODO
     }
   }

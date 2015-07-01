@@ -34,7 +34,7 @@ object BytesUtils {
     }
   }
 
-  def toString(input: HBaseRawType, offset: Int, length: Int): UTF8String = {
+  def toUTF8String(input: HBaseRawType, offset: Int, length: Int): UTF8String = {
     UTF8String(input.slice(offset, offset + length))
   }
 

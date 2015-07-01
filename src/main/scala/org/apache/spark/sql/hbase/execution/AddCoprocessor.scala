@@ -48,6 +48,10 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
         val rdd = new HBaseCoprocessorSQLReaderRDD(
           null, codegenEnabled, oldScan.output, None, sqlContext)
         HBaseSQLTableScan(oldScan.relation, oldScan.output, rdd)
+      case GeneratedAggregate(partial, groupingExpressions, aggregateExpressions,
+                              true, child) if codegenEnabled =>
+        // For now we do not support unsafe ops inside coprocessor for lack of memory manager
+        GeneratedAggregate(partial, groupingExpressions, aggregateExpressions, false, child)
     }
 
     val oldRDD: HBaseSQLReaderRDD = oldScan.result.asInstanceOf[HBaseSQLReaderRDD]
