@@ -17,16 +17,8 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.spark.SparkContext
-import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.{SqlParser, ParserDialect}
-import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+import org.apache.spark.sql.catalyst.ParserDialect
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.rules.RuleExecutor
-import org.apache.spark.sql.execution.{EnsureRequirements, SparkPlan}
-import org.apache.spark.sql.hbase.execution.{AddCoprocessor, HBaseStrategies}
 
 private[spark] class HBaseSQLDialect extends ParserDialect {
   @transient
