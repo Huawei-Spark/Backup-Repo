@@ -28,26 +28,11 @@ import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.execution.{EnsureRequirements, SparkPlan}
 import org.apache.spark.sql.hbase.execution.{AddCoprocessor, HBaseStrategies}
 
-class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) {
-  self =>
-
-  def this(sparkContext: JavaSparkContext) = this(sparkContext.sc)
-
-  protected[sql] override lazy val conf: SQLConf = new HBaseSQLConf
-
-  HBaseConfiguration.merge(
-    sc.hadoopConfiguration, HBaseConfiguration.create(sc.hadoopConfiguration))
-
+private[spark] class HBaseSQLDialect extends ParserDialect {
   @transient
-  override protected[sql] lazy val catalog: HBaseCatalog =
-    new HBaseCatalog(this, sc.hadoopConfiguration) with OverrideCatalog
+  protected val sqlParser = new HBaseSQLParser
 
-  experimental.extraStrategies = Seq((new SparkPlanner with HBaseStrategies).HBaseDataSource)
-
-  @transient
-  override protected[sql] val prepareForExecution = new RuleExecutor[SparkPlan] {
-    val batches = Batch("Add exchange", Once, EnsureRequirements(self)) ::
-      Batch("Add coprocessor", Once, AddCoprocessor(self)) ::
-      Nil
+  override def parse(sqlText: String): LogicalPlan = {
+    sqlParser.parse(sqlText)
   }
 }

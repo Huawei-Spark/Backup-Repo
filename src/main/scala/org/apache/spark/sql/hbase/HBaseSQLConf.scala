@@ -31,7 +31,11 @@ private[hbase] object HBaseSQLConf {
  *
  */
 private[hbase] class HBaseSQLConf extends SQLConf {
-  import org.apache.spark.sql.hbase.HBaseSQLConf._
+
+  private[spark] override def dialect: String = getConf(SQLConf.DIALECT,
+    classOf[HBaseSQLDialect].getCanonicalName)
+
+  import HBaseSQLConf._
 
   /** The expiration of cached partition (i.e., region) info; defaults to 10 minutes . */
   private[hbase] def partitionExpiration: Long = getConf(PARTITION_EXPIRATION, "600").toLong
