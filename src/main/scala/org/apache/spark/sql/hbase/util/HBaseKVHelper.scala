@@ -60,13 +60,18 @@ object HBaseKVHelper {
                             keyColumns: Seq[KeyColumn],
                             startIndex: Int = 0): Seq[(Int, Int)] = {
     var index = startIndex
+    var pos = 0
     keyColumns.map {
       case c =>
         if (index >= rowKey.length) (-1, -1)
         else {
           val offset = index
           if (c.dataType == StringType) {
-            val pos = rowKey.indexOf(delimiter, index)
+            pos = rowKey.indexOf(delimiter, index)
+            if (pos == -1) {
+              // this is at the last dimension
+              pos = rowKey.length
+            }
             index = pos + 1
             (offset, pos - offset)
           } else {
