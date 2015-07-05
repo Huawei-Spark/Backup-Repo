@@ -238,31 +238,4 @@ class BasicQueriesSuite extends HBaseTestData {
 
     logInfo(s"Test $testnm completed successfully")
   }
-
-  // Tests on the STRING-key table
-  testnm = "STRING-KEY Table IN filtering"
-  test("STRING-KEY Table IN filtering") {
-    val query1 = s"""SELECT doublecol AS double1, -1 * doublecol AS minusdouble,
-     substr(strcol, 2) AS substrcol, doublecol, strcol,
-     bytecol, shortcol, intcol, longcol, floatcol FROM $StringKeyTableName
-     WHERE doublecol IN (5678912.345682, 5678912.345683)""".stripMargin
-
-    val result1 = runSql(query1)
-    logInfo(s"$query1 came back with $result1.length results")
-    assert(result1.length == 2, s"$testnm failed on size")
-    val exparr = Array(
-      Array(5678912.345682, -5678912.345682, "ow2", 5678912.345682,
-        "Row2", 'b', 12342, 23456782, 3456789012342L, 45657.82F),
-      Array(5678912.345683, -5678912.345683, "ow3", 5678912.345683,
-        "Row3", -29, 12343, 23456783, 3456789012343L, 45657.83))
-
-    val res = {
-      for (rx <- 0 until 1)
-      yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
-    }.foldLeft(true) { case (res1, newres) => res1 && newres}
-    logInfo(result1.mkString)
-    assert(res, "One or more rows did not match expected")
-
-    logInfo(s"Test $testnm completed successfully")
-  }
 }

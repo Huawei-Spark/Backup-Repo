@@ -26,9 +26,7 @@ import org.apache.spark.sql.SQLContext
  *
  */
 class HBaseTestData extends HBaseIntegrationTestBase {
-  val StringKeyTableName = "StringKeyTable" // table with the sole STRING key
   val TestTableName = "TestTable"
-  val StringKeyHBaseTableName: String = s"Hb$StringKeyHBaseTableName"
   val TestHBaseTableName: String = s"Hb$TestTableName"
   val TestHbaseColFamilies = Seq("cf1", "cf2")
 
@@ -51,22 +49,12 @@ class HBaseTestData extends HBaseIntegrationTestBase {
             MAPPED BY ($TestHBaseTableName, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
       .stripMargin
-    val stringKeyTableCreationSQL = s"""CREATE TABLE $StringKeyTableName(strcol STRING,
-                                    bytecol BYTE, shortcol SHORT, intcol INTEGER,
-            longcol LONG, floatcol FLOAT, doublecol DOUBLE, PRIMARY KEY(strcol))
-            MAPPED BY ($StringKeyHBaseTableName, COLS=[bytecol=cf1.hbytecol,
-            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol,
-            doublecol=cf1.hdoublecol, intcol=cf2.hintcol])"""
-      .stripMargin
     createTable(TestTableName, TestHBaseTableName, testTableCreationSQL)
-    createTable(StringKeyTableName, StringKeyHBaseTableName, stringKeyTableCreationSQL)
     loadData(TestTableName, s"$CsvPath/$DefaultLoadFile")
-    loadData(StringKeyTableName, s"$CsvPath/$DefaultLoadFile")
   }
 
   override protected def afterAll() = {
     super.afterAll()
-    TestHbase.sql("DROP TABLE " + StringKeyTableName)
     TestHbase.sql("DROP TABLE " + TestTableName)
   }
 
