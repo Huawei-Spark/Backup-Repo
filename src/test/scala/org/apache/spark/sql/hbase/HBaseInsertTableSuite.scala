@@ -32,13 +32,13 @@ class HBaseInsertTableSuite extends HBaseTestData {
     runSql(createQuery)
 
     val insertQuery =
-      s"""INSERT INTO TABLE insertTestTable SELECT * FROM $DefaultTableName"""
+      s"""INSERT INTO TABLE insertTestTable SELECT * FROM $TestTableName"""
         .stripMargin
     runSql(insertQuery)
 
     val testQuery = "SELECT * FROM insertTestTable"
     val testResult = runSql(testQuery)
-    val targetResult = runSql(s"SELECT * FROM $DefaultTableName")
+    val targetResult = runSql(s"SELECT * FROM $TestTableName")
     assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
@@ -57,14 +57,14 @@ class HBaseInsertTableSuite extends HBaseTestData {
     runSql(createQuery)
 
     val insertQuery =
-      s"""insert into table insertTestTableFilter select * from $DefaultTableName
+      s"""insert into table insertTestTableFilter select * from $TestTableName
         where doublecol > 5678912.345681"""
         .stripMargin
     runSql(insertQuery)
 
     val testQuery = "select * from insertTestTableFilter"
     val testResult = runSql(testQuery)
-    val targetResult = runSql(s"select * from $DefaultTableName where doublecol > 5678912.345681")
+    val targetResult = runSql(s"select * from $TestTableName where doublecol > 5678912.345681")
     assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)
@@ -91,7 +91,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
 
     val insertQuery =
       s"""INSERT INTO TABLE insertTestTableFewCols SELECT strcol, bytecol,
-        shortcol, intcol FROM $DefaultTableName ORDER BY strcol"""
+        shortcol, intcol FROM $TestTableName ORDER BY strcol"""
         .stripMargin
     runSql(insertQuery)
 
@@ -99,7 +99,7 @@ class HBaseInsertTableSuite extends HBaseTestData {
       "SELECT strcol, bytecol, shortcol, intcol FROM insertTestTableFewCols ORDER BY strcol"
     val testResult = runSql(testQuery)
     val targetResult =
-      runSql(s"SELECT strcol, bytecol, shortcol, intcol FROM $DefaultTableName ORDER BY strcol")
+      runSql(s"SELECT strcol, bytecol, shortcol, intcol FROM $TestTableName ORDER BY strcol")
     assert(testResult.length == targetResult.length, s"$testnm failed on size")
 
     compareResults(testResult, targetResult)

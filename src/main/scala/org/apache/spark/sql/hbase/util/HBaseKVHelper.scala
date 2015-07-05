@@ -33,19 +33,24 @@ object HBaseKVHelper {
    * @return array of bytes
    */
   def encodingRawKeyColumns(rawKeyColumns: Seq[(HBaseRawType, DataType)]): HBaseRawType = {
-    val length = rawKeyColumns.foldLeft(0)((b, a) => {
-      val len = b + a._1.length
-      if (a._2 == StringType) len + 1 else len
-    })
+    var length = 0;
+    for (i <- 0 until rawKeyColumns.length) {
+      length += rawKeyColumns(i)._1.length
+      if (rawKeyColumns(i)._2 == StringType && i < rawKeyColumns.length - 1) {
+        length += 1
+      }
+    }
     val result = new HBaseRawType(length)
     var index = 0
+    var kcIdx = 0
     for (rawKeyColumn <- rawKeyColumns) {
       Array.copy(rawKeyColumn._1, 0, result, index, rawKeyColumn._1.length)
       index += rawKeyColumn._1.length
-      if (rawKeyColumn._2 == StringType) {
+      if (rawKeyColumn._2 == StringType && kcIdx < rawKeyColumns.length - 1) {
         result(index) = delimiter
         index += 1
       }
+      kcIdx += 1
     }
     result
   }
@@ -54,23 +59,30 @@ object HBaseKVHelper {
    * generate the sequence information of key columns from the byte array
    * @param rowKey array of bytes
    * @param keyColumns the sequence of key columns
+   * @param keyLength rowkey length: specified if not negative
    * @return sequence of information in (offset, length) tuple
    */
   def decodingRawKeyColumns(rowKey: HBaseRawType,
                             keyColumns: Seq[KeyColumn],
+                            keyLength: Int = -1,
                             startIndex: Int = 0): Seq[(Int, Int)] = {
     var index = startIndex
     var pos = 0
+    val limit = if (keyLength < 0) {
+      rowKey.length
+    } else {
+      index + keyLength
+    }
     keyColumns.map {
       case c =>
-        if (index >= rowKey.length) (-1, -1)
+        if (index >= limit) (-1, -1)
         else {
           val offset = index
           if (c.dataType == StringType) {
             pos = rowKey.indexOf(delimiter, index)
-            if (pos == -1) {
+            if (pos == -1 || pos > limit) {
               // this is at the last dimension
-              pos = rowKey.length
+              pos = limit
             }
             index = pos + 1
             (offset, pos - offset)

@@ -26,11 +26,11 @@ import org.apache.spark.sql.SQLContext
  *
  */
 class HBaseTestData extends HBaseIntegrationTestBase {
-  val DefaultStagingTableName = "StageTable"
-  val DefaultTableName = "TestTable"
-  val DefaultHbaseStagingTableName = s"Hb$DefaultStagingTableName"
-  val DefaultHbaseTabName = s"Hb$DefaultTableName"
-  val DefaultHbaseColFamilies = Seq("cf1", "cf2")
+  val StringKeyTableName = "StringKeyTable" // table with the sole STRING key
+  val TestTableName = "TestTable"
+  val StringKeyHBaseTableName: String = s"Hb$StringKeyHBaseTableName"
+  val TestHBaseTableName: String = s"Hb$TestTableName"
+  val TestHbaseColFamilies = Seq("cf1", "cf2")
 
   val CsvPaths = Array("src/test/resources", "sql/hbase/src/test/resources")
   val DefaultLoadFile = "testTable.txt"
@@ -45,15 +45,29 @@ class HBaseTestData extends HBaseIntegrationTestBase {
 
   override protected def beforeAll() = {
     super.beforeAll()
-    createTables(DefaultStagingTableName, DefaultTableName,
-      DefaultHbaseStagingTableName, DefaultHbaseTabName)
-    loadData(DefaultStagingTableName, DefaultTableName, s"$CsvPath/$DefaultLoadFile")
+    val testTableCreationSQL = s"""CREATE TABLE $TestTableName(strcol STRING, bytecol BYTE,
+                               shortcol SHORT, intcol INTEGER,
+            longcol LONG, floatcol FLOAT, doublecol DOUBLE, PRIMARY KEY(doublecol, strcol, intcol))
+            MAPPED BY ($TestHBaseTableName, COLS=[bytecol=cf1.hbytecol,
+            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
+      .stripMargin
+    val stringKeyTableCreationSQL = s"""CREATE TABLE $StringKeyTableName(strcol STRING,
+                                    bytecol BYTE, shortcol SHORT, intcol INTEGER,
+            longcol LONG, floatcol FLOAT, doublecol DOUBLE, PRIMARY KEY(strcol))
+            MAPPED BY ($StringKeyHBaseTableName, COLS=[bytecol=cf1.hbytecol,
+            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol,
+            doublecol=cf1.hdoublecol, intcol=cf2.hintcol])"""
+      .stripMargin
+    createTable(TestTableName, TestHBaseTableName, testTableCreationSQL)
+    createTable(StringKeyTableName, StringKeyHBaseTableName, stringKeyTableCreationSQL)
+    loadData(TestTableName, s"$CsvPath/$DefaultLoadFile")
+    loadData(StringKeyTableName, s"$CsvPath/$DefaultLoadFile")
   }
 
   override protected def afterAll() = {
     super.afterAll()
-    TestHbase.sql("DROP TABLE " + DefaultStagingTableName)
-    TestHbase.sql("DROP TABLE " + DefaultTableName)
+    TestHbase.sql("DROP TABLE " + StringKeyTableName)
+    TestHbase.sql("DROP TABLE " + TestTableName)
   }
 
   def createNativeHbaseTable(tableName: String, families: Seq[String]) = {
@@ -79,21 +93,10 @@ class HBaseTestData extends HBaseIntegrationTestBase {
     }
   }
 
-  def createTables(stagingTableName: String,
-                   tableName: String,
-                   hbaseStagingTable: String,
-                   hbaseTable: String) = {
+  def createTable(tableName: String, hbaseTable: String, creationSQL: String) = {
     val hbaseAdmin = TestHbase.hbaseAdmin
-    if (!hbaseAdmin.tableExists(TableName.valueOf(hbaseStagingTable))) {
-      createNativeHbaseTable(hbaseStagingTable, DefaultHbaseColFamilies)
-    }
     if (!hbaseAdmin.tableExists(TableName.valueOf(hbaseTable))) {
-      createNativeHbaseTable(hbaseTable, DefaultHbaseColFamilies)
-    }
-
-    if (TestHbase.catalog.checkLogicalTableExist(stagingTableName)) {
-      val dropSql = s"DROP TABLE $stagingTableName"
-      runSql(dropSql)
+      createNativeHbaseTable(hbaseTable, TestHbaseColFamilies)
     }
 
     if (TestHbase.catalog.checkLogicalTableExist(tableName)) {
@@ -101,41 +104,16 @@ class HBaseTestData extends HBaseIntegrationTestBase {
       runSql(dropSql)
     }
 
-    val (stagingSql, tabSql) =
-      ( s"""CREATE TABLE $stagingTableName(strcol STRING, bytecol STRING, shortcol STRING, intcol STRING,
-            longcol STRING, floatcol STRING, doublecol STRING, PRIMARY KEY(doublecol, strcol, intcol))
-            MAPPED BY ($hbaseStagingTable, COLS=[bytecol=cf1.hbytecol,
-            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
-        .stripMargin
-        ,
-        s"""CREATE TABLE $tableName(strcol STRING, bytecol BYTE, shortcol SHORT, intcol INTEGER,
-            longcol LONG, floatcol FLOAT, doublecol DOUBLE, PRIMARY KEY(doublecol, strcol, intcol))
-            MAPPED BY ($hbaseTable, COLS=[bytecol=cf1.hbytecol,
-            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
-          .stripMargin
-        )
     try {
-      logInfo(s"invoking $stagingSql ..")
-      runSql(stagingSql)
-    } catch {
-      case e: TableExistsException =>
-        logInfo("IF NOT EXISTS still not implemented so we get the following exception", e)
-    }
-
-    logDebug(s"Created table $tableName: " +
-      s"isTableAvailable= ${hbaseAdmin.isTableAvailable(s2b(hbaseStagingTable))}" +
-      s" tableDescriptor= ${hbaseAdmin.getTableDescriptor(s2b(hbaseStagingTable))}")
-
-    try {
-      logInfo(s"invoking $tabSql ..")
-      runSql(tabSql)
+      logInfo(s"invoking $creationSQL ..")
+      runSql(creationSQL)
     } catch {
       case e: TableExistsException =>
         logInfo("IF NOT EXISTS still not implemented so we get the following exception", e)
     }
   }
 
-  def loadData(stagingTableName: String, tableName: String, loadFile: String) = {
+  def loadData(tableName: String, loadFile: String) = {
     // then load data into table
     val loadSql = s"LOAD PARALL DATA LOCAL INPATH '$loadFile' INTO TABLE $tableName"
     runSql(loadSql)
@@ -144,7 +122,6 @@ class HBaseTestData extends HBaseIntegrationTestBase {
   def s2b(s: String) = Bytes.toBytes(s)
 
   def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
-    val execQuery1 = sqlCtx.executeSql(sql)
     val result1 = runSql(sql)
     assert(result1.length == exparr.length, s"$testName failed on size")
     verify(testName,

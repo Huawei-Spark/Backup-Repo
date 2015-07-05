@@ -22,7 +22,7 @@ class AggregateQueriesSuite extends HBaseTestData {
   test("Group by with cols in select list and with order by") {
     val query =
       s"""SELECT count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecol, max(shortcol) shortcol,
-          max(floatcol) floatcolmax, max(doublecol) doublecol, max(longcol) from $DefaultTableName
+          max(floatcol) floatcolmax, max(doublecol) doublecol, max(longcol) from $TestTableName
           WHERE strcol LIKE '%Row%' AND shortcol < 12345 AND doublecol > 5678912.345681
           AND doublecol < 5678912.345684
           GROUP BY intcol, floatcol, strcol ORDER BY strcol DESC"""
@@ -35,7 +35,7 @@ class AggregateQueriesSuite extends HBaseTestData {
     val query = s"""SELECT count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecolmax,
          max(shortcol) shortcolmax, max(floatcol) floatcolmax, max(doublecol) doublecolmax,
          max(longcol) longcolmax
-         FROM $DefaultTableName
+         FROM $TestTableName
          WHERE strcol like '%Row%' AND shortcol < 12345 AND doublecol > 5678912.345681
          AND doublecol < 5678912.345685
          GROUP BY intcol, floatcol, strcol
@@ -67,7 +67,7 @@ class AggregateQueriesSuite extends HBaseTestData {
   test("Another Group by with cols in select list and with having and order by") {
     val query1 =
       s"""SELECT count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecolmax, max(shortcol) shortcolmax,
-          max(floatcol) floatcolmax, max(doublecol) doublecolmax, max(longcol) longcolmax FROM $DefaultTableName
+          max(floatcol) floatcolmax, max(doublecol) doublecolmax, max(longcol) longcolmax FROM $TestTableName
           WHERE strcol LIKE '%Row%' AND shortcol < 12345 AND doublecol > 5678912.345681
           AND doublecol < 5678912.345685
           GROUP BY intcol, floatcol, strcol HAVING max(doublecol) < 5678912.345684 ORDER BY strcol DESC"""

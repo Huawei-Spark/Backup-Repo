@@ -924,7 +924,7 @@ private[hbase] case class HBaseRelation(
     }
 
     lazy val rowKeys = HBaseKVHelper.decodingRawKeyColumns(
-      result.head.getRowArray, keyColumns, result.head.getRowOffset)
+      result.head.getRowArray, keyColumns, result.head.getRowLength, result.head.getRowOffset)
     projections.foreach {
       p =>
         columnMap.get(p._1.name).get match {
