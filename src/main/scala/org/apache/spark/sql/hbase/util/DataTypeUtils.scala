@@ -160,7 +160,7 @@ object DataTypeUtils {
       case IntegerType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Int]))
       case LongType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Long]))
       case ShortType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Short]))
-      case StringType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[String]))
+      case StringType => new BinaryComparator(bu.toBytes(expression.value))
       case _ => throw new Exception("Cannot convert the data type using BinaryComparator")
     }
   }
