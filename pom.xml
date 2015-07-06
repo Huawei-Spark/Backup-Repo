@@ -982,6 +982,9 @@
     </profile>
     <profile>
       <id>hadoop-2.4</id>
+      <activation>  
+        <activeByDefault>true</activeByDefault>
+      </activation>  
       <properties>
         <hadoop.version>2.4.0</hadoop.version>
         <protobuf.version>2.5.0</protobuf.version>

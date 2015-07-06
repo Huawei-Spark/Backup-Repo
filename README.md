@@ -25,13 +25,13 @@ II. Go to the root of the source tree
 ```
     $ cd spark-hbase
 ```
-III. Build
+III. Build without testing
 ```
     $ mvn -Phbase,hadoop-2.4 -Dhadoop.version=2.4.0 -DskipTests clean package install
 ```
-IV. Run test suites against a HBase minicluster, from Maven.
+IV. Build and run test suites against a HBase minicluster, from Maven.
 ```
-    $ mvn -Phbase,hadoop-2.4 -Dhadoop.version=2.4.0 test
+    $ mvn clean install
 ```
 
 ## Interactive Scala Shell
