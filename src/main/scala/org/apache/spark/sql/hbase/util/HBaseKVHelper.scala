@@ -24,7 +24,7 @@ import org.apache.spark.sql.types._
 import scala.collection.mutable.ArrayBuffer
 
 object HBaseKVHelper {
-  private val delimiter: Byte = 0
+  val delimiter: Byte = 0
 
   /**
    * create row key based on key columns information

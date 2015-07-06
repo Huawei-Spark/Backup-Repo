@@ -455,12 +455,12 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     }
 
     val splitKeys: Array[HBaseRawType] = Array(
-      generateRowKey(Array(1024, "0b", 0), 3),
-      generateRowKey(Array(2048, "cc", 1024), 4),
-      generateRowKey(Array(4096, "0a", 0), 4) ++ Array[Byte](0x00),
-      generateRowKey(Array(4096, "0b", 1024), 7),
-      generateRowKey(Array(4096, "cc", 0), 7) ++ Array[Byte](0x00),
-      generateRowKey(Array(4096, "cc", 1000))
+      generateRowKey(Array(1024, UTF8String("0b"), 0), 3),
+      generateRowKey(Array(2048, UTF8String("cc"), 1024), 4),
+      generateRowKey(Array(4096, UTF8String("0a"), 0), 4),
+      generateRowKey(Array(4096, UTF8String("0b"), 1024), 7),
+      generateRowKey(Array(4096, UTF8String("cc"), 0), 7),
+      generateRowKey(Array(4096, UTF8String("cc"), 1000))
     )
     TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf"), splitKeys, withCoprocessor)
 

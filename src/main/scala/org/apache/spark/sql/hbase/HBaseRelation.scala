@@ -794,9 +794,6 @@ private[hbase] case class HBaseRelation(
       val predRefs = pred.references.toSeq
       val predicateNameSet = predRefs.map(_.name).
         filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
-      val boundPred = BindReferences.bindReference(pred, predRefs)
-      val row = new GenericRow(predRefs.size)
-      val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
       if (distinctProjectionList.toSet.subsetOf(predicateNameSet)) {
         // If the pushed down predicate is present and the projection is a subset of the columns
         // of the pushed filters, use the columns as projections
@@ -971,8 +968,8 @@ private[hbase] case class HBaseRelation(
    * Convert the row key to its proper format. Due to the nature of HBase, the start and
    * end of partition could be partial row key, we may need to append 0x00 to make it comply
    * with the definition of key columns, for example, add four 0x00 if a key column type is
-   * integer. Also string type will always be even number, so we need to add one 0x00 or two
-   * depends on the length of the byte.
+   * integer. Also string type (of UTF8) may need to be padded with the minimum UTF8
+   * continuation byte(s)
    * @param rawKey the original row key
    * @return the proper row key based on the definition of the key columns
    */
@@ -982,8 +979,8 @@ private[hbase] case class HBaseRelation(
     /**
      * Recursively run this function to check the key columns one by one.
      * If the input raw key contains the whole part of this key columns, then continue to
-     * check the next one; otherwise, append the raw key by adding 0x00 to its proper format
-     * and return it.
+     * check the next one; otherwise, append the raw key by adding 0x00(or minimal UTF8
+     * continuation bytes) to its proper format and return it.
      * @param rowIndex the start point of unchecked bytes in the input raw key
      * @param curKeyIndex the next key column need to be checked
      * @return the proper row key based on the definition of the key columns
@@ -993,12 +990,16 @@ private[hbase] case class HBaseRelation(
       else {
         val typeOfKey = keyColumns(curKeyIndex)
         if (typeOfKey.dataType == StringType) {
-          val indexOfStringEnd = origRowKey.indexOf(0x00, rowIndex)
+          val indexOfStringEnd = origRowKey.indexOf(HBaseKVHelper.delimiter, rowIndex)
           if (indexOfStringEnd == -1) {
-            val delta: Array[Byte] = if ((origRowKey.length - rowIndex) % 2 == 0) {
-              new Array[Byte](1 + getMinimum(curKeyIndex + 1))
+            val nOfUTF8StrBytes = HBaseRelation.numOfBytes(origRowKey(rowIndex))
+            val delta = if (nOfUTF8StrBytes > origRowKey.length - rowIndex) {
+              // padding of 1000 0000 is needed according to UTF-8 spec
+              Array.fill[Byte](nOfUTF8StrBytes - origRowKey.length
+                + rowIndex)(HBaseRelation.utf8Padding) ++
+                new Array[Byte](getMinimum(curKeyIndex + 1))
             } else {
-              new Array[Byte](2 + getMinimum(curKeyIndex + 1))
+              new Array[Byte](getMinimum(curKeyIndex + 1))
             }
             origRowKey ++ delta
           } else {
@@ -1007,7 +1008,7 @@ private[hbase] case class HBaseRelation(
         } else {
           val nextRowIndex = rowIndex +
             typeOfKey.dataType.asInstanceOf[AtomicType].defaultSize
-          if (nextRowIndex <= origRowKey.length) {
+          if (nextRowIndex < origRowKey.length) {
             getFinalRowKey(nextRowIndex, curKeyIndex + 1)
           } else {
             val delta: Array[Byte] = {
@@ -1052,5 +1053,24 @@ private[hbase] case class HBaseRelation(
         pi._1._1, pi._1._2, keyColumns(pi._2).dataType))
     }
   }
+}
+
+private[hbase] object HBaseRelation {
+  //  Copied from UTF8String for accessibility reasons therein
+  private val bytesOfCodePointInUTF8: Array[Int] = Array(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5,
+    6, 6, 6, 6)
+
+  @inline
+  def numOfBytes(b: Byte): Int = {
+    val offset = (b & 0xFF) - 192
+    if (offset >= 0) bytesOfCodePointInUTF8(offset) else 1
+  }
+
+  val zeroByte: Array[Byte] = new Array(1)
+  val utf8Padding: Byte = 0x80.asInstanceOf[Byte]
 }
 
