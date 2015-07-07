@@ -288,12 +288,10 @@ private[hbase] case class HBaseRelation(
    */
   def buildCPRFilterList(output: Seq[Attribute], filterPred: Option[Expression],
                          cprs: Seq[MDCriticalPointRange[_]]):
-  (Option[FilterList], Option[Expression], Seq[Expression]) = {
-    val finalFilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+  (Option[Filter], Option[Expression]) = {
     val cprFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
     var expressionList: List[Expression] = List[Expression]()
     var anyNonpushable = false
-    val pushablePreds = new ListBuffer[Expression]()
     for (cpr <- cprs) {
       val cprAndPushableFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
       val startKey: Option[Any] = cpr.lastRange.start
@@ -302,7 +300,7 @@ private[hbase] case class HBaseRelation(
       val endInclusive = cpr.lastRange.endInclusive
       val keyType: AtomicType = cpr.lastRange.dt
       val predicate = Option(cpr.lastRange.pred)
-      val (pushable, nonPushable, pushablePred) = buildPushdownFilterList(predicate)
+      val (pushable, nonPushable) = buildPushdownFilterList(predicate)
 
       val items: Seq[(Any, AtomicType)] = cpr.prefix
       val head: Seq[(HBaseRawType, AtomicType)] = items.map {
@@ -478,9 +476,6 @@ private[hbase] case class HBaseRelation(
       }
       cprAndPushableFilterList.addFilter(filter)
       if (pushable.isDefined) {
-        require(pushablePred.isDefined && pushablePred.nonEmpty,
-          "Internal logic error: non-empty pushable predicate expected")
-        pushablePreds += pushablePred.get
         cprAndPushableFilterList.addFilter(pushable.get)
       }
       cprFilterList.addFilter(cprAndPushableFilterList)
@@ -491,12 +486,15 @@ private[hbase] case class HBaseRelation(
     } else {
       None
     }
-    if (cprFilterList.getFilters.size() == 1) {
-      finalFilterList.addFilter(cprFilterList.getFilters.get(0))
+    val finalFilterList: Filter = if (cprFilterList.getFilters.size() == 1) {
+      cprFilterList.getFilters.get(0)
     } else if (cprFilterList.getFilters.size() > 1) {
-      finalFilterList.addFilter(cprFilterList)
+      cprFilterList
+    } else {
+      require(false, "internal logic error: nonempty filter list is expected")
+      null
     }
-    (Some(finalFilterList), orExpression, pushablePreds)
+    (Some(finalFilterList), orExpression)
   }
 
   /**
@@ -505,7 +503,7 @@ private[hbase] case class HBaseRelation(
    * @return tuple(filter list, non-pushdownable expression, pushdown predicates)
    */
   def buildPushdownFilterList(pred: Option[Expression]):
-  (Option[FilterList], Option[Expression], Option[Expression]) = {
+  (Option[FilterList], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
       // build pred pushdown filters:
@@ -519,9 +517,9 @@ private[hbase] case class HBaseRelation(
         if (pushdownFilterPred.isEmpty) None else buildFilterListFromPred(pushdownFilterPred)
       }
       // 4. merge the above FilterList with the one from the projection
-      (predPushdownFilterList, otherPred, pushdownFilterPred)
+      (predPushdownFilterList, otherPred)
     } else {
-      (None, None, None)
+      (None, None)
     }
   }
 
@@ -720,8 +718,7 @@ private[hbase] case class HBaseRelation(
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
                 predicate: Option[Expression],
-                filters: Option[FilterList], otherFilters: Option[Expression],
-                pushdownPreds: Seq[Expression],
+                filters: Option[Filter], otherFilters: Option[Expression],
                 useCustomFilter: Boolean,
                 projectionList: Seq[NamedExpression]): Scan = {
     val scan = {
@@ -738,22 +735,20 @@ private[hbase] case class HBaseRelation(
 
     // add Family to SCAN from projections
     addColumnFamiliesToScan(scan, filters, otherFilters,
-      predicate, pushdownPreds, useCustomFilter, projectionList)
+      predicate, useCustomFilter, projectionList)
   }
 
   /**
    * add projection and column to the scan
    * @param scan the current scan
-   * @param filters the filter list to be processed
+   * @param filters the filter/filter list to be processed
    * @param otherFilters the non-pushdownable predicates
-   * @param pushdownPreds the pushdownable predicates
    * @param projectionList the projection list
    * @return the proper scan
    */
-  def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
+  def addColumnFamiliesToScan(scan: Scan, filters: Option[Filter],
                               otherFilters: Option[Expression],
                               predicate: Option[Expression],
-                              pushdownPreds: Seq[Expression],
                               useCustomFilter: Boolean,
                               projectionList: Seq[NamedExpression]): Scan = {
     var distinctProjectionList = projectionList.map(_.name)
@@ -767,23 +762,15 @@ private[hbase] case class HBaseRelation(
       distinctProjectionList.filterNot(p => keyColumns.exists(_.sqlName == p))
 
     var finalFilters = if (distinctProjectionList.isEmpty) {
-      if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-        if (filters.get.getFilters.size() == 1) {
-          filters.get.getFilters.get(0)
-        } else {
-          filters.get
-        }
+      if (filters.isDefined) {
+        filters.get
       } else {
         keyOnlyFilterPresent = true
         new FirstKeyOnlyFilter
       }
     } else {
-      if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-        if (filters.get.getFilters.size() == 1) {
-          filters.get.getFilters.get(0)
-        } else {
-          filters.get
-        }
+      if (filters.isDefined) {
+        filters.get
       } else {
         null
       }

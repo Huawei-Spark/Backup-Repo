@@ -181,14 +181,9 @@ class HBasePostCoprocessorSQLReaderRDD(
         flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicate)
-      val pushablePreds = if (pushdownPreds.isDefined) {
-        ListBuffer[Expression](pushdownPreds.get)
-      } else {
-        ListBuffer[Expression]()
-      }
+      val (filters, otherFilters) = relation.buildPushdownFilterList(predicate)
       val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
-        otherFilters, pushablePreds, useCustomFilter, output)
+        otherFilters, useCustomFilter, output)
       setCoprocessor(scan, otherFilters, split.index)
       val scanner = relation.htable.getScanner(scan)
       createIterator(context, scanner, None)
@@ -275,10 +270,10 @@ class HBasePostCoprocessorSQLReaderRDD(
         }
 
 
-        val (filters, otherFilters, preds) =
+        val (filters, otherFilters) =
           relation.buildCPRFilterList(output, predicate, expandedCPRs)
         val scan = relation.buildScan(start, end, predicate, filters,
-          otherFilters, preds, useCustomFilter, output)
+          otherFilters, useCustomFilter, output)
         setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
         if (useCustomFilter) {
@@ -420,14 +415,9 @@ class HBaseSQLReaderRDD(
         flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicate)
-      val pushablePreds = if (pushdownPreds.isDefined) {
-        ListBuffer[Expression](pushdownPreds.get)
-      } else {
-        ListBuffer[Expression]()
-      }
+      val (filters, otherFilters) = relation.buildPushdownFilterList(predicate)
       val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
-        otherFilters, pushablePreds, useCustomFilter, output)
+        otherFilters, useCustomFilter, output)
       val scanner = relation.htable.getScanner(scan)
 
       if (useCustomFilter && deploySuccessfully.isDefined && deploySuccessfully.get) {
@@ -517,11 +507,10 @@ class HBaseSQLReaderRDD(
           partition.end
         }
 
-
-        val (filters, otherFilters, preds) =
+        val (filters, otherFilters) =
           relation.buildCPRFilterList(output, predicate, expandedCPRs)
         val scan = relation.buildScan(start, end, predicate, filters,
-          otherFilters, preds, useCustomFilter, output)
+          otherFilters, useCustomFilter, output)
         val scanner = relation.htable.getScanner(scan)
         if (useCustomFilter && deploySuccessfully.isDefined && deploySuccessfully.get) {
           // other filters will be evaluated as part of a custom filter
