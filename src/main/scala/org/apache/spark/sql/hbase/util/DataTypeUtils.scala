@@ -84,12 +84,8 @@ object DataTypeUtils {
                                    index: Int,
                                    src: HBaseRawType,
                                    offset: Int,
-                                   length: => Int,
+                                   length: Int,
                                    dt: DataType): Unit = {
-    if (src == null || src.isEmpty) {
-      row.setNullAt(index)
-      return
-    }
     dt match {
       case BooleanType => row.setBoolean(index, BytesUtils.toBoolean(src, offset))
       case ByteType => row.setByte(index, BytesUtils.toByte(src, offset))

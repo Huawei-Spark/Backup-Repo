@@ -55,11 +55,11 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
     }
 
     val oldRDD: HBaseSQLReaderRDD = oldScan.result.asInstanceOf[HBaseSQLReaderRDD]
-    val newRDD = new HBasePostCoprocessorSQLReaderRDD(
+    val newRDD = new HBaseSQLReaderRDD(
       oldRDD.relation, codegenEnabled,
       oldRDD.useCustomFilter,
-      oldRDD.output,
-      oldRDD.filterPred, newSubplan, sqlContext)
+      oldRDD.output, Some(newSubplan), oldRDD.deploySuccessfully,
+      oldRDD.filterPred, sqlContext)
     val newScan = new HBaseSQLTableScan(oldRDD.relation, subplan.output, newRDD)
 
     // add project spark plan if projection list has duplicate

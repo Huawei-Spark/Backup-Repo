@@ -491,7 +491,7 @@ private[hbase] case class HBaseRelation(
     } else if (cprFilterList.getFilters.size() > 1) {
       cprFilterList
     } else {
-      require(false, "internal logic error: nonempty filter list is expected")
+      require(requirement = false, "internal logic error: nonempty filter list is expected")
       null
     }
     (Some(finalFilterList), orExpression)
@@ -710,6 +710,7 @@ private[hbase] case class HBaseRelation(
       context.conf.codegenEnabled,
       context.conf.asInstanceOf[HBaseSQLConf].useCustomFilter,
       requiredColumns,
+      subplan = None,
       deploySuccessfully,
       filterPredicate, // PartitionPred : Option[Expression]
       context
@@ -849,22 +850,34 @@ private[hbase] case class HBaseRelation(
     // TODO: add columns to the Get
   }
 
+  /**
+   *
+   * @param kv the cell value to work with
+   * @param projection the pair of projection and its index
+   * @param row the row to set values on
+   */
+  private def setRow(kv: Cell, projection: (Attribute, Int), row: MutableRow): Unit = {
+    if (kv == null || kv.getValueLength == 0) {
+      row.setNullAt(projection._2)
+    } else {
+      val dt = projection._1.dataType
+      if (dt.isInstanceOf[AtomicType]) {
+        DataTypeUtils.setRowColumnFromHBaseRawType(
+          row, projection._2, kv.getValueArray, kv.getValueOffset, kv.getValueLength, dt)
+      } else {
+        // for complex types, deserialiation is involved and we aren't sure about buffer safety
+        val colValue = CellUtil.cloneValue(kv)
+        DataTypeUtils.setRowColumnFromHBaseRawType(
+          row, projection._2, colValue, 0, colValue.length, dt)
+      }
+    }
+  }
+
   def buildRowAfterCoprocessor(projections: Seq[(Attribute, Int)],
                                result: Result,
                                row: MutableRow): Row = {
     for (i <- projections.indices) {
-      val kv: Cell = result.rawCells()(i)
-      val colValue: HBaseRawType = CellUtil.cloneValue(kv)
-      DataTypeUtils.setRowColumnFromHBaseRawType(
-        row, projections(i)._2, colValue, 0, colValue.length, projections(i)._1.dataType)
-      //      if (kv == null || kv.getValueLength == 0) {
-      //        DataTypeUtils.setRowColumnFromHBaseRawType(
-      //          row, projections(i)._2, null, 0, 0, projections(i)._1.dataType)
-      //      } else {
-      //        DataTypeUtils.setRowColumnFromHBaseRawType(
-      //          row, projections(i)._2, kv.getValueArray, kv.getValueOffset,
-      //          kv.getValueLength, projections(i)._1.dataType)
-      //      }
+      setRow(result.rawCells()(i), projections(i), row)
     }
     row
   }
@@ -914,13 +927,7 @@ private[hbase] case class HBaseRelation(
         columnMap.get(p._1.name).get match {
           case column: NonKeyColumn =>
             val kv = getColumnLatestCell(column.familyRaw, column.qualifierRaw)
-            if (kv == null || kv.getValueLength == 0) {
-              DataTypeUtils.setRowColumnFromHBaseRawType(
-                row, p._2, null, 0, 0, column.dataType)
-            } else {
-              DataTypeUtils.setRowColumnFromHBaseRawType(
-                row, p._2, kv.getValueArray, kv.getValueOffset, kv.getValueLength, column.dataType)
-            }
+            setRow(kv, p, row)
           case keyIndex: Int =>
             val (start, length) = rowKeys(keyIndex)
             DataTypeUtils.setRowColumnFromHBaseRawType(
@@ -938,11 +945,9 @@ private[hbase] case class HBaseRelation(
       p =>
         columnMap.get(p._1.name).get match {
           case column: NonKeyColumn =>
-            val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
-            DataTypeUtils.setRowColumnFromHBaseRawType(
-              row, p._2, colValue, 0, colValue.length, column.dataType)
-          case ki =>
-            val keyIndex = ki.asInstanceOf[Int]
+            val kv: Cell = result.getColumnLatestCell(column.familyRaw, column.qualifierRaw)
+            setRow(kv, p, row)
+          case keyIndex: Int =>
             val (start, length) = rowKeys(keyIndex)
             DataTypeUtils.setRowColumnFromHBaseRawType(
               row, p._2, result.getRow, start, length, keyColumns(keyIndex).dataType)
