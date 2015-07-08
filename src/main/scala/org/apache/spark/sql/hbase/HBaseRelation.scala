@@ -783,16 +783,35 @@ private[hbase] case class HBaseRelation(
       val predicateNameSet = predRefs.map(_.name).
         filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
       if (distinctProjectionList.toSet.subsetOf(predicateNameSet)) {
-        // If the pushed down predicate is present and the projection is a subset of the columns
-        // of the pushed filters, use the columns as projections
-        // to avoid a full projection
+        // If the pushed down predicate is present and the projection is a subset
+        // of the columns of the pushed filters, use the columns as projections
+        // to avoid a full projection. The point is that by default without
+        // adding column explicitly, the HBase scan would return all columns.
+        // However there is some complexity when the predicate involves checks against
+        // nullness. For instance, "SELECT c1 from ... where c2 is null" would require
+        // the full projection before a check can be made since any existence of
+        // any other column would qualify the row. In contrast, a query of
+        // "SELECT c2 from ... where c2 is not null" will only require the existence
+        // of c2 so we can restrict the interested qualifiers to "c2" only.
         distinctProjectionList = predicateNameSet.toSeq.distinct
         val boundPred = BindReferences.bindReference(pred, predRefs)
-        val row = new GenericRow(predRefs.size)
+        val row = new GenericRow(predRefs.size) // an all-null row
         val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
         val (addColumn, nkcols) = prRes match {
+          //  At least one existing column has to be fetched to qualify the record,
+          //  so we can just use the predicate's full projection
           case (false, _) => (true, distinctProjectionList)
+
+          // Even an absent column may qualify the record, we have to fetch
+          // all columns before evaluate the predicate. Note that by doing this, the "fullness"
+          // of projection has a semantic scope of the HBase table, not the SQL table
+          // mapped to the HBase table.
           case (true, _) => (false, null)
+
+          // Any and all absent columns aren't enough to determine the record qualification,
+          // so the 'remaining' prdeicate's projections have to be consulted and we
+          // can avoid full projection again by adding the 'remaining' prdeicate's projections
+          // to the scan's column map if the projections are non-key columns
           case (null, reducedPred) =>
             val nkRefs = reducedPred.references.map(_.name).filterNot(
               p => keyColumns.exists(_.sqlName == p))
@@ -856,7 +875,7 @@ private[hbase] case class HBaseRelation(
    * @param projection the pair of projection and its index
    * @param row the row to set values on
    */
-  private def setRow(kv: Cell, projection: (Attribute, Int), row: MutableRow): Unit = {
+  private def setColumn(kv: Cell, projection: (Attribute, Int), row: MutableRow): Unit = {
     if (kv == null || kv.getValueLength == 0) {
       row.setNullAt(projection._2)
     } else {
@@ -877,7 +896,7 @@ private[hbase] case class HBaseRelation(
                                result: Result,
                                row: MutableRow): Row = {
     for (i <- projections.indices) {
-      setRow(result.rawCells()(i), projections(i), row)
+      setColumn(result.rawCells()(i), projections(i), row)
     }
     row
   }
@@ -927,7 +946,7 @@ private[hbase] case class HBaseRelation(
         columnMap.get(p._1.name).get match {
           case column: NonKeyColumn =>
             val kv = getColumnLatestCell(column.familyRaw, column.qualifierRaw)
-            setRow(kv, p, row)
+            setColumn(kv, p, row)
           case keyIndex: Int =>
             val (start, length) = rowKeys(keyIndex)
             DataTypeUtils.setRowColumnFromHBaseRawType(
@@ -946,7 +965,7 @@ private[hbase] case class HBaseRelation(
         columnMap.get(p._1.name).get match {
           case column: NonKeyColumn =>
             val kv: Cell = result.getColumnLatestCell(column.familyRaw, column.qualifierRaw)
-            setRow(kv, p, row)
+            setColumn(kv, p, row)
           case keyIndex: Int =>
             val (start, length) = rowKeys(keyIndex)
             DataTypeUtils.setRowColumnFromHBaseRawType(

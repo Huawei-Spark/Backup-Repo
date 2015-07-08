@@ -37,8 +37,8 @@ import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperation
  * The skip is multiple-dimensional on non-leading dimension keys in precense of the predicate's
  * range expressions; other types of expressions in the predicate will be eventually evaluated
  *
- * The processing is stateful in that various info related to the previous processing is cahched
- * for maximum reuse
+ * The processing is stateful in that various info related to the previous processing is cahched,
+ * and checked in the next invocations for maximum reuse.
  */
 private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
 

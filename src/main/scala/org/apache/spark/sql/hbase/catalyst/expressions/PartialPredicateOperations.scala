@@ -24,18 +24,40 @@ import org.apache.spark.sql.hbase.types._
 import org.apache.spark.sql.hbase.types.RangeType._
 
 object PartialPredicateOperations {
-  // Partial reduction is nullness-based, i.e., uninterested columns are assigned nulls,
+  // When the checkNullness argument of the partialReduce method is false, the partial
+  // reduction is nullness-based, i.e., uninterested columns are assigned nulls,
   // which necessitates changes of the null handling from the normal evaluations
-  // of predicate expressions
+  // of predicate expressions. The IsNull/IsNotNull will return indefinite results.
+  //
+  // When the checkNullness argument of the partialReduce method is true, the "is null"
+  // and "is not null" will return true or false in a definite manner; while other expressions
+  // will evaluate to indefinite values.
+  //
+  // The whole mechanism is based upon the fact that any expression will evaluate to null
+  // if any of its operands is null.
+  //
   // There are 3 possible results: TRUE, FALSE, and MAYBE represented by a predicate
   // which will be used to further filter the results
   implicit class partialPredicateReducer(e: Expression) {
+    /**
+     * @param e the expression to be partially evaluated
+     * @param schema the schema of 'e'
+     * @return the original attribute for the bound reference
+     */
     def unboundAttributeReference(e: Expression, schema: Seq[Attribute]): Expression = {
       e transform {
         case b: BoundReference => schema(b.ordinal)
       }
     }
 
+    /**
+     *
+     * @param input rows to evaluate against
+     * @param schema the schema of 'e'
+     * @param checkNull the flag to check whether the partial evaluation is
+     *                  for nullness checking purpose or not
+     * @return
+     */
     def partialReduce(input: Row, schema: Seq[Attribute], checkNull: Boolean = false):
       (Any, Expression) = {
       e match {
