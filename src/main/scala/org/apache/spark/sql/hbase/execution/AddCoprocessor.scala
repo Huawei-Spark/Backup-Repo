@@ -70,9 +70,8 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
     if (!sqlContext.conf.asInstanceOf[HBaseSQLConf].useCoprocessor) {
       return plan
     }
-    var createSubplan: Boolean = false
-    var createSubplanLeft: Boolean = false
-    var path: List[SparkPlan] = List[SparkPlan]()
+    var needToCreateSubplan: Boolean = false
+    var needToCreateSubplanSeq: Seq[Boolean] = Seq()
     plan match {
       // If the plan is tableScan directly, we don't need to use coprocessor
       case HBaseSQLTableScan(_, _, _) => plan
@@ -80,39 +79,43 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       case _ =>
         val result = plan.transformUp {
           case scan: HBaseSQLTableScan if coprocessorIsAvailable(scan.relation) =>
-            createSubplanLeft = createSubplan
-            createSubplan = true
+            needToCreateSubplanSeq :+= needToCreateSubplan
+            needToCreateSubplan = true
+            scan
+
+          case scan: LeafNode =>
+            needToCreateSubplanSeq :+= needToCreateSubplan
+            needToCreateSubplan = false
             scan
 
           // If subplan is needed then we need coprocessor plans for both children
-          case binaryNode: BinaryNode if createSubplanLeft || createSubplan =>
-            val leftPlan: SparkPlan = if (createSubplanLeft) {
-              createSubplanLeft = false
-              generateNewSubplan(binaryNode.left)
-            } else binaryNode.left
-            val rightPlan: SparkPlan = if (createSubplan) {
-              createSubplan = false
-              generateNewSubplan(binaryNode.right)
-            } else binaryNode.right
-            // In trait trees.BinaryNode, the order of its children is (left, right).
-            // Thus, we use the same order here to compose the new children
-            val newChildren = Seq(leftPlan, rightPlan)
-            binaryNode.withNewChildren(newChildren)
+          case node: SparkPlan if (node.children.size > 1) &&
+            (needToCreateSubplan || needToCreateSubplanSeq.contains(true)) =>
+            val newChildren = (needToCreateSubplanSeq :+ needToCreateSubplan)
+              .zip(node.children).map{
+              case (ntcsp, child) => {
+                if (ntcsp) generateNewSubplan(child)
+                else child
+              }
+            }
+            needToCreateSubplanSeq = Seq()
+            needToCreateSubplan = false
+            node.withNewChildren(newChildren)
 
           // Since the following two plans using shuffledRDD,
           // we could not pass them to the coprocessor.
           // Thus, their child are used as the subplan for coprocessor processing.
-          case exchange: Exchange if createSubplan =>
-            createSubplan = false
+          case exchange: Exchange if needToCreateSubplan =>
+            needToCreateSubplan = false
             val newPlan = generateNewSubplan(exchange.child)
             exchange.withNewChildren(Seq(newPlan))
-          case limit: Limit if createSubplan =>
-            createSubplan = false
+          case limit: Limit if needToCreateSubplan =>
+            needToCreateSubplan = false
             val newPlan = generateNewSubplan(limit.child)
             limit.withNewChildren(Seq(newPlan))
         }
         // Use coprocessor even without shuffling
-        if (createSubplan) generateNewSubplan(result) else result
+        if (needToCreateSubplan) generateNewSubplan(result) else result
     }
   }
 }

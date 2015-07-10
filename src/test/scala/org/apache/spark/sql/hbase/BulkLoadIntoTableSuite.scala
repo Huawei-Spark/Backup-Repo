@@ -516,6 +516,61 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     TestHbase.sql("drop table testblk")
     dropNativeHbaseTable("presplit_table")
   }
+
+  test("UNION TEST") {
+    aggregationTest1()
+  }
+
+  def aggregationTest1(withCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+    val types1 = Seq(IntegerType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+    def generateRowKey1(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types1)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+    TestHbase.catalog.createHBaseUserTable("people", Set("cf"), null, withCoprocessor)
+
+    val sql0 =
+      s"""CREATE TABLE spark_teacher_3key(
+          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
+          PRIMARY KEY(grade, class, subject))
+          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
+        .stripMargin
+    TestHbase.executeSql(sql0).toRdd.collect()
+    val sql1 =
+      s"""CREATE TABLE spark_people(
+          rowNum INT, people_name STRING, people_age INT,
+          school_identification STRING, school_director STRING,
+          PRIMARY KEY(rowNum))
+          MAPPED BY (people, COLS=[people_name=cf.a, people_age=cf.b,
+          school_identification=cf.c, school_director=cf.d])"""
+        .stripMargin
+    TestHbase.executeSql(sql1).toRdd.collect()
+
+    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
+    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
+    TestHbase.executeSql(loadSql0).toRdd.collect()
+    val inputFile1 = "'" + hbaseHome + "/people.txt'"
+    val loadSql1 = "LOAD PARALL DATA LOCAL INPATH " + inputFile1 + " INTO TABLE spark_people"
+    TestHbase.executeSql(loadSql1).toRdd.collect()
+
+    val sql = "select people_name from spark_people union select teacher_name from spark_teacher_3key"
+    checkResult(TestHbase.sql(sql), containExchange = true, 4)
+
+    TestHbase.sql("drop table spark_teacher_3key")
+    dropNativeHbaseTable("teacher")
+    TestHbase.sql("drop table spark_people")
+    dropNativeHbaseTable("people")
+  }
   
   def checkResult(df: DataFrame, containExchange:Boolean, size: Int) = {
     df.queryExecution.executedPlan match {
