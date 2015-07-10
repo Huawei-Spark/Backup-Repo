@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.SQLConf
 
-private[hbase] object HBaseSQLConf {
+object HBaseSQLConf {
   val PARTITION_EXPIRATION = "spark.sql.hbase.partition.expiration"
   val SCANNER_FETCH_SIZE = "spark.sql.hbase.scanner.fetchsize"
   val USE_COPROCESSOR = "spark.sql.hbase.coprocessor"

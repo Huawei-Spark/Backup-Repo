@@ -711,6 +711,7 @@ private[hbase] case class HBaseRelation(
       context.conf.asInstanceOf[HBaseSQLConf].useCustomFilter,
       requiredColumns,
       subplan = None,
+      dummyRDD = null,
       deploySuccessfully,
       filterPredicate, // PartitionPred : Option[Expression]
       context

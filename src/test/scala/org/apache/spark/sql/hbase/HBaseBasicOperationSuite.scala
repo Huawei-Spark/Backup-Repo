@@ -85,6 +85,18 @@ class HBaseBasicOperationSuite extends HBaseSplitTestData {
     assert(sql( """SELECT count(*) FROM ta where col4 IN (1, 2, 3)""").collect()(0).get(0) == 1)
   }
 
+  test("Point Aggregate Query") {
+    sql( """CREATE TABLE tb2 (column2 INTEGER, column1 INTEGER, column4 FLOAT,
+          column3 SHORT, PRIMARY KEY(column1, column2))
+          MAPPED BY (testNamespace.ht0, COLS=[column3=family1.qualifier1,
+          column4=family2.qualifier2])"""
+    )
+    sql( """INSERT INTO TABLE tb2 SELECT col4,col4,col6,col3 FROM ta""")
+    val result = sql( """SELECT count(*) FROM tb2 where column1=1 AND column2=1""").collect()
+    assert(result.size == 1)
+    assert(result(0).get(0) == 1)
+  }
+
   test("Select test 1 (AND, OR)") {
     assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").collect().length == 2)
     assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").collect().length == 4)
