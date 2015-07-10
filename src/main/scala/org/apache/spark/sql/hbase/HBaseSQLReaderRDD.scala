@@ -37,13 +37,29 @@ object CoprocessorConstants {
 }
 
 /**
- * HBaseSQLReaderRDD
+ *
+ * @param relation the HBase relation
+ * @param codegenEnabled whether codegen is in effect
+ * @param useCustomFilter whether custom filter is in effect
+ * @param output projection. For post coprocessor processing,
+ *               is the projection of the original scan
+ * @param subplan coproecssor subplan to be sent to coprocessor
+ * @param dummyRDD in-memory scan RDD, might be used to reconstruct the original subplan.
+ *                    This is possible when decision to use coprocessor has to be made
+ *                    by the slaves when its partition-specific predicate is
+ *                    determined, for efficiency reason by individual slaves and
+ *                    not the driver. It can't be constructed and has to be sent over
+ *                    by the driver for a RDD restriction
+ * @param deploySuccessfully whether this jar is usable by HBase region servers
+ * @param filterPred predicate pushed down in the physical plan
+ * @param sqlContext SQL context
  */
 class HBaseSQLReaderRDD(val relation: HBaseRelation,
                         val codegenEnabled: Boolean,
                         val useCustomFilter: Boolean,
                         val output: Seq[Attribute],
-                        val subplan: Option[SparkPlan],
+                        subplan: Option[SparkPlan],
+                        dummyRDD: DummyRDD,
                         val deploySuccessfully: Option[Boolean],
                         @transient val filterPred: Option[Expression],
                         @transient sqlContext: SQLContext)
@@ -62,6 +78,17 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
     val result = sp.execute()
     initDependencies(result)
     result
+  } else {
+    null
+  }
+
+  private val restoredSubplanRDD = if (hasSubPlan) {
+    val rdd = subplan.get.transformUp {
+      case HBaseSQLTableScan(relation: HBaseRelation, output: Seq[Attribute], _) =>
+        HBaseSQLTableScan(relation, output, dummyRDD)
+    }.execute()
+    initDependencies(rdd)
+    rdd
   } else {
     null
   }
@@ -258,7 +285,14 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
           if predicate == null || evalResultForBoundPredicate(resultRow, predicate)
         } yield resultRow
 
-        resultRows.toIterator
+        val result = resultRows.toIterator
+        if (hasSubPlan) {
+          // restore the original subplan using the dummyRDD
+          dummyRDD.result = result
+          restoredSubplanRDD.compute(split, context)
+        } else {
+          result
+        }
       }
       else {
         // isPointRanges is false
@@ -318,5 +352,19 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
         }
       }
     }
+  }
+}
+
+private[hbase] class DummyRDD(@transient sqlContext: SQLContext)
+  extends RDD[Row](sqlContext.sparkContext, Nil) {
+
+  var result: Iterator[Row] = _
+
+  override def getPartitions = ???
+
+  override def getPreferredLocations(split: Partition) = ???
+
+  override def compute(split: Partition, taskContext: TaskContext): Iterator[Row] = {
+    result
   }
 }
