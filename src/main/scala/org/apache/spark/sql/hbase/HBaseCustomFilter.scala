@@ -19,16 +19,16 @@ package org.apache.spark.sql.hbase
 
 import java.io._
 
-import org.apache.hadoop.hbase.{KeyValue, CellUtil, Cell}
 import org.apache.hadoop.hbase.exceptions.DeserializationException
 import org.apache.hadoop.hbase.filter.Filter.ReturnCode
 import org.apache.hadoop.hbase.filter.FilterBase
 import org.apache.hadoop.hbase.util.{Bytes, Writables}
+import org.apache.hadoop.hbase.{Cell, CellUtil, KeyValue}
 import org.apache.hadoop.io.Writable
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.hbase.util.{HBaseKVHelper, DataTypeUtils, BytesUtils}
-import org.apache.spark.sql.types.{DataType, AtomicType, StringType}
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils, HBaseKVHelper}
+import org.apache.spark.sql.types.{AtomicType, DataType, StringType}
 
 /**
  * The custom filter, it will skip the scan to the proper next position based on predicate
@@ -54,9 +54,9 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * @param children the children nodes for a non-leaf node; otherwise null
    */
   private case class Node(dt: AtomicType = null, dimension: Int = -1, parent: Node = null,
-                           var currentChildIndex: Int = -1, var currentValue: Any = null,
-                           var cpr: CriticalPointRange[Any] = null,
-                           var children: Seq[Node] = null) {
+                          var currentChildIndex: Int = -1, var currentValue: Any = null,
+                          var cpr: CriticalPointRange[Any] = null,
+                          var children: Seq[Node] = null) {
 
     // for full evaluation purpose
     lazy val boundRef = if (dimension == relation.dimSize - 1 && cpr != null && cpr.pred != null) {
@@ -120,7 +120,6 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   }
 
 
-
   /**
    * convert the relation / predicate to byte array, used by framework
    * @param dataOutput the output to write
@@ -169,7 +168,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    */
   def resetNode(node: Node) = {
     if (node != null && node.cpr != null) {
-      node.currentValue = node.cpr.start.getOrElse(null)
+      node.currentValue = node.cpr.start.orNull
       if (node.currentValue != null && !node.cpr.startInclusive) {
         // if ths start is open-ended, try to add one
         addOne(node)
@@ -202,11 +201,11 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   private def isInCurrentRanges(dimValues: Seq[Any], dimLimit: Int): (Boolean, Node) = {
     var node = root
     while (node.children != null && node.currentChildIndex != -1 &&
-           node.currentValue != null &&
-           node.children(node.currentChildIndex).dimension < dimLimit &&
-           compareWithinRange(node.dt,
-             dimValues(node.children(node.currentChildIndex).dimension),
-             node.children(node.currentChildIndex).cpr) == 0) {
+      node.currentValue != null &&
+      node.children(node.currentChildIndex).dimension < dimLimit &&
+      compareWithinRange(node.dt,
+        dimValues(node.children(node.currentChildIndex).dimension),
+        node.children(node.currentChildIndex).cpr) == 0) {
       node = node.children(node.currentChildIndex)
     }
     if (node.children == null) {
@@ -264,7 +263,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * @return (false, -1) if value is beyond the range of the largest child's CPR ;
    *         (true, childIndex) if the input is within a range and the index of the child;
    *         (false, nextCPRIndex) if the next position is not within a range
-   *                               but is smaller than the largest child's CPR
+   *         but is smaller than the largest child's CPR
    */
   private def findPositionInRanges(node: Node): (Boolean, Int) = {
     require(node.children != null, "Internal logic error: children expected")
@@ -349,13 +348,12 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     // find the child for the value in the children
     val (found, childIndex) = findPositionInRanges(node)
     if (found) {
-      if (node.currentChildIndex != childIndex)
-      {
+      if (node.currentChildIndex != childIndex) {
         require(childIndex >= node.currentChildIndex)
         for (i <- node.currentChildIndex until childIndex if node.dimension == -1) {
           // reset passed children to release the memory: only for the children
           // of the most significant dimension; higher dimensions' children are reusable
-          if (i >= 0 ) {
+          if (i >= 0) {
             node.children(i).children = null
           }
         }
@@ -364,11 +362,11 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       val child = node.children(childIndex)
       child.currentValue = currentValues(child.dimension)
       if (node.dimension == relation.dimSize - 2) {
-        nextRowKey = buildRowKey
+        nextRowKey = buildRowKey()
         if (child.cpr != null && child.cpr.pred != null) {
           remainingPredicate = child.cpr.pred.references.toSeq
           remainingPredicateBoundRef = BindReferences.bindReference(child.cpr.pred,
-                                                                    predReferences)
+            predReferences)
         }
         (ReturnCode.INCLUDE, nextRowKey)
       } else {
@@ -388,13 +386,13 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       val child = node.children(childIndex)
       resetDecendents(child)
       if (child.cpr != null) {
-        child.currentValue = child.cpr.start.getOrElse(null)
+        child.currentValue = child.cpr.start.orNull
         if (child.currentValue != null && !child.cpr.startInclusive) {
           // if ths start is open-ended, try to add one
           addOne(child)
         }
       }
-      (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
+      (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey())
     }
   }
 
@@ -404,25 +402,25 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * @return (return code, the row key after successful increment)
    */
   def increment(node: Node): (ReturnCode, HBaseRawType) = {
-    var currentNode:Node = node
-    while (currentNode.parent !=  null) {
+    var currentNode: Node = node
+    while (currentNode.parent != null) {
       if (addOne(currentNode)) {
         val cmp = compareWithinRange(currentNode.cpr.dt, currentNode.currentValue, currentNode.cpr)
         if (cmp == 0) {
           resetDecendents(currentNode)
-          return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
+          return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey())
         } else {
           require(cmp > 0, "Internal logical error: unexpected ordering of row key")
-          if (currentNode.parent.currentChildIndex < currentNode.parent.children.size -1) {
+          if (currentNode.parent.currentChildIndex < currentNode.parent.children.size - 1) {
             // get to the start of the next sibling CPR
             val childIndex = currentNode.parent.currentChildIndex + 1
-            if (currentNode.dimension == 0)  {
+            if (currentNode.dimension == 0) {
               // no look back: release the memory
               currentNode.children = null
             }
             resetDecendents(currentNode.parent)
             currentNode.parent.currentChildIndex = childIndex
-            return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
+            return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey())
           } else {
             // beyond CPR's range of this dimension,
             // increment the next (more significant) dimension
@@ -433,8 +431,9 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
         return (ReturnCode.NEXT_ROW, null)
       }
     }
-    return (ReturnCode.SKIP, null)
+    (ReturnCode.SKIP, null)
   }
+
   /**
    *
    * @param node the node to add 1 to
@@ -489,7 +488,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       val levelNode: Node = node.children(node.currentChildIndex)
       val dt = levelNode.dt
       val value = BytesUtils.create(dt).toBytes(levelNode.currentValue)
-      list = list :+ (value, dt)
+      list = list :+(value, dt)
       if (levelNode.dimension < relation.dimSize - 1) {
         generateCPRs(levelNode)
       }
@@ -557,7 +556,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
         Seq(new CriticalPointRange[t](None, false, None, false, dt, predExpr))
       }
       node.children = qualifiedCPRanges.map(range => {
-          Node(dt, dimIndex, node, cpr = range)
+        Node(dt, dimIndex, node, cpr = range)
       })
     } else {
       node.children = Seq(Node(dt, dimIndex, node,
@@ -581,7 +580,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
         val qualifier = CellUtil.cloneQualifier(item)
         val nkc = relation.nonKeyColumns.find(a =>
           Bytes.compareTo(a.familyRaw, family) == 0 &&
-          Bytes.compareTo(a.qualifierRaw, qualifier) == 0).get
+            Bytes.compareTo(a.qualifierRaw, qualifier) == 0).get
         val value = DataTypeUtils.bytesToData(data, 0, data.length, nkc.dataType)
         cellMap += (nkc -> value)
       }
@@ -643,6 +642,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
 
 object HBaseCustomFilter {
   val empty = Array[Byte]()
+
   def parseFrom(pbBytes: Array[Byte]): HBaseCustomFilter = {
     try {
       Writables.getWritable(pbBytes, new HBaseCustomFilter()).asInstanceOf[HBaseCustomFilter]

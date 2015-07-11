@@ -428,7 +428,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   }
 
   test("group test for presplit table without coprocessor and codegen") {
-    aggregationTest(false)
+    aggregationTest(withCoprocessor = false)
   }
 
   test("group test for presplit table with codegen and coprocessor") {
@@ -441,7 +441,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   test("group test for presplit table with codegen but without coprocessor") {
     val originalValue = TestHbase.conf.codegenEnabled
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
-    aggregationTest(false)
+    aggregationTest(withCoprocessor = false)
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
   }
 
@@ -606,6 +606,41 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
+
+    TestHbase.sql("drop table spark_teacher_3key")
+    dropNativeHbaseTable("teacher")
+  }
+
+  test("TEST Random") {
+    TestRandom()
+  }
+
+  def TestRandom(withCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+
+    val sql0 =
+      s"""CREATE TABLE spark_teacher_3key(
+          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
+          PRIMARY KEY(grade, class, subject))
+          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
+        .stripMargin
+    TestHbase.executeSql(sql0).toRdd.collect()
+
+    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
+    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
+    TestHbase.executeSql(loadSql0).toRdd.collect()
+
+    val df: DataFrame = TestHbase.table("spark_teacher_3key")
+    import org.apache.spark.sql.functions._
+    df.select(col("*"), randn(5L)).show()
 
     TestHbase.sql("drop table spark_teacher_3key")
     dropNativeHbaseTable("teacher")

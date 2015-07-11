@@ -65,14 +65,14 @@ class HBaseSQLParser extends SqlParser {
       insertValues | load | show | describe
 
   protected lazy val insertValues: Parser[LogicalPlan] =
-      INSERT ~> INTO ~> TABLE ~> ident ~ (VALUES ~> "(" ~> values <~ ")") ^^ {
-        case tableName ~ valueSeq =>
-          val valueStringSeq = valueSeq.map { case v =>
-            if (v.value == null) null
-            else v.value.toString
-          }
-          InsertValueIntoTableCommand(tableName, valueStringSeq)
-      }
+    INSERT ~> INTO ~> TABLE ~> ident ~ (VALUES ~> "(" ~> values <~ ")") ^^ {
+      case tableName ~ valueSeq =>
+        val valueStringSeq = valueSeq.map { case v =>
+          if (v.value == null) null
+          else v.value.toString
+        }
+        InsertValueIntoTableCommand(tableName, valueStringSeq)
+    }
 
   protected lazy val create: Parser[LogicalPlan] =
     CREATE ~> TABLE ~> ident ~
@@ -247,9 +247,7 @@ class HBaseSQLParser extends SqlParser {
 
   protected lazy val tableCol: Parser[(String, String)] =
     ident ~ primitiveType ^^ {
-      case e1 ~ e2 => {
-        (e1, e2.toString.dropRight(4).toUpperCase)
-      }
+      case e1 ~ e2 => (e1, e2.toString.dropRight(4).toUpperCase)
     }
 
   protected lazy val nameSpace: Parser[String] = ident <~ "."

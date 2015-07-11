@@ -33,7 +33,7 @@ object HBaseKVHelper {
    * @return array of bytes
    */
   def encodingRawKeyColumns(rawKeyColumns: Seq[(HBaseRawType, DataType)]): HBaseRawType = {
-    var length = 0;
+    var length = 0
     for (i <- 0 until rawKeyColumns.length) {
       length += rawKeyColumns(i)._1.length
       if (rawKeyColumns(i)._2 == StringType && i < rawKeyColumns.length - 1) {

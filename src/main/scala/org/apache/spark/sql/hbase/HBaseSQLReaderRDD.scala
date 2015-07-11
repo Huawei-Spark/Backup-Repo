@@ -34,6 +34,7 @@ object CoprocessorConstants {
   final val COKEY: String = "coproc"
   final val COINDEX: String = "parIdx"
   final val COTYPE: String = "dtType"
+  final val COTASK: String = "tskCtx"
 }
 
 /**
@@ -45,11 +46,11 @@ object CoprocessorConstants {
  *               is the projection of the original scan
  * @param subplan coproecssor subplan to be sent to coprocessor
  * @param dummyRDD in-memory scan RDD, might be used to reconstruct the original subplan.
- *                    This is possible when decision to use coprocessor has to be made
- *                    by the slaves when its partition-specific predicate is
- *                    determined, for efficiency reason by individual slaves and
- *                    not the driver. It can't be constructed and has to be sent over
- *                    by the driver for a RDD restriction
+ *                 This is possible when decision to use coprocessor has to be made
+ *                 by the slaves when its partition-specific predicate is
+ *                 determined, for efficiency reason by individual slaves and
+ *                 not the driver. It can't be constructed and has to be sent over
+ *                 by the driver for a RDD restriction
  * @param deploySuccessfully whether this jar is usable by HBase region servers
  * @param filterPred predicate pushed down in the physical plan
  * @param sqlContext SQL context
@@ -66,9 +67,9 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
   val hasSubPlan = subplan.isDefined
   val rowBuilder: (Seq[(Attribute, Int)], Result, MutableRow) => Row = if (hasSubPlan) {
-    relation.buildRowAfterCoprocessor _
+    relation.buildRowAfterCoprocessor
   } else {
-    relation.buildRow _
+    relation.buildRow
   }
   val newSubplanRDD: RDD[Row] = if (hasSubPlan) {
     // Since HBase doesn't hold all information,
@@ -221,11 +222,16 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
     }
 
     val outputDataType: Seq[DataType] = subplan.get.output.map(attr => attr.dataType)
+    val taskContextPara: (Int, Int, Long, Int) = TaskContext.get() match {
+      case t: TaskContextImpl => (t.stageId, t.partitionId, t.taskAttemptId, t.attemptNumber)
+      case _ => (0, 0, 0L, 0)
+    }
 
     scan.setAttribute(CoprocessorConstants.COINDEX,
-        Bytes.toBytes(partitionIndex))
+      Bytes.toBytes(partitionIndex))
     scan.setAttribute(CoprocessorConstants.COTYPE, HBaseSerializer.serialize(outputDataType))
     scan.setAttribute(CoprocessorConstants.COKEY, HBaseSerializer.serialize(newSubplanRDD))
+    scan.setAttribute(CoprocessorConstants.COTASK, HBaseSerializer.serialize(taskContextPara))
   }
 
   // For critical-point-based predicate pushdown
@@ -343,7 +349,7 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
         if (hasSubPlan) setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
         if ((useCustomFilter || hasSubPlan) && deploySuccessfully.isDefined
-             && deploySuccessfully.get) {
+          && deploySuccessfully.get) {
           // other filters will be evaluated as part of a custom filter
           // or nonexistent in post coprocessor execution
           createIterator(context, scanner, None)

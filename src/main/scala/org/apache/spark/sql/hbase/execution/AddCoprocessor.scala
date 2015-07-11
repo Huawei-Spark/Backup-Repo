@@ -51,7 +51,8 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       case GeneratedAggregate(partial, groupingExpressions, aggregateExpressions,
       true, child) if codegenEnabled =>
         // For now we do not support unsafe ops inside coprocessor for lack of memory manager
-        GeneratedAggregate(partial, groupingExpressions, aggregateExpressions, false, child)
+        GeneratedAggregate(
+          partial, groupingExpressions, aggregateExpressions, unsafeEnabled = false, child)
     }
 
     val oldRDD: HBaseSQLReaderRDD = oldScan.result.asInstanceOf[HBaseSQLReaderRDD]
@@ -94,10 +95,9 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
             (needToCreateSubplan || needToCreateSubplanSeq.contains(true)) =>
             val newChildren = (needToCreateSubplanSeq :+ needToCreateSubplan)
               .zip(node.children).map {
-              case (ntcsp, child) => {
+              case (ntcsp, child) =>
                 if (ntcsp) generateNewSubplan(child)
                 else child
-              }
             }
             needToCreateSubplanSeq = Seq()
             needToCreateSubplan = false

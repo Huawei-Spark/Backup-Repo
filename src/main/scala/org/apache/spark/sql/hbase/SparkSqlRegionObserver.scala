@@ -140,7 +140,7 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
                                scan: Scan,
                                s: RegionScanner) = {
     val serializedPartitionIndex = scan.getAttribute(CoprocessorConstants.COINDEX)
-    if(serializedPartitionIndex == null) {
+    if (serializedPartitionIndex == null) {
       logger.debug("Work without coprocessor")
       super.postScannerOpen(e, scan, s)
     } else {
@@ -153,15 +153,28 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
       val serializedRDD = scan.getAttribute(CoprocessorConstants.COKEY)
       val subPlanRDD: RDD[Row] = HBaseSerializer.deserialize(serializedRDD).asInstanceOf[RDD[Row]]
 
+      val taskParaInfo = scan.getAttribute(CoprocessorConstants.COTASK)
+      val (stageId, partitionId, taskAttemptId, attemptNumber) =
+        HBaseSerializer.deserialize(taskParaInfo).asInstanceOf[(Int, Int, Long, Int)]
+      val taskContext = new TaskContextImpl(
+        stageId, partitionId, taskAttemptId, attemptNumber, null, false, new TaskMetrics)
+
       val regionInfo = s.getRegionInfo
       val startKey = if (regionInfo.getStartKey.isEmpty) None else Some(regionInfo.getStartKey)
       val endKey = if (regionInfo.getEndKey.isEmpty) None else Some(regionInfo.getEndKey)
 
       val result = subPlanRDD.compute(
         new HBasePartition(partitionIndex, partitionIndex, startKey, endKey, newScanner = s),
-        new TaskContextImpl(0, 0, 0L, 0, null, false, new TaskMetrics))
+        taskContext)
 
       new BaseRegionScanner() {
+        var initialized = TaskContext.get != null
+
+        def init() = {
+          TaskContext.setTaskContext(taskContext)
+          initialized = true
+        }
+
         override def getRegionInfo: HRegionInfo = regionInfo
 
         override def getMaxResultSize: Long = s.getMaxResultSize
@@ -171,6 +184,7 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
         override def next(results: java.util.List[Cell]): Boolean = {
           val hasMore: Boolean = result.hasNext
           if (hasMore) {
+            if (!initialized) init()
             val nextRow = result.next()
             val numOfCells = outputDataType.length
             for (i <- 0 until numOfCells) {

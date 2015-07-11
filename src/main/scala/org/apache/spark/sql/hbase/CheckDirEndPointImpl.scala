@@ -18,8 +18,8 @@
 package org.apache.spark.sql.hbase
 
 import com.google.protobuf.{RpcCallback, RpcController, Service}
-import org.apache.hadoop.hbase.{CoprocessorEnvironment, Coprocessor}
 import org.apache.hadoop.hbase.coprocessor._
+import org.apache.hadoop.hbase.{Coprocessor, CoprocessorEnvironment}
 import org.apache.log4j.Logger
 
 /*When we enable coprocessor and codegen at the same time,
@@ -45,9 +45,10 @@ class CheckDirEndPointImpl
   private var env: RegionCoprocessorEnvironment = null
 
   override def start(env: CoprocessorEnvironment) = {
-    if (env.isInstanceOf[RegionCoprocessorEnvironment]) {
-      this.env = env.asInstanceOf[RegionCoprocessorEnvironment]
-    } else throw new CoprocessorException("Must be loaded on a table region!");
+    env match {
+      case e: RegionCoprocessorEnvironment => e
+      case _ => throw new CoprocessorException("Must be loaded on a table region!")
+    }
   }
 
   override def stop(env: CoprocessorEnvironment) = {}
