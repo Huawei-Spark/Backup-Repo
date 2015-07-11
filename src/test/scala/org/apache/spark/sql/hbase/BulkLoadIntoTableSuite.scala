@@ -20,13 +20,13 @@ package org.apache.spark.sql.hbase
 import java.io.File
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.execution.Exchange
-import org.apache.spark.sql.{DataFrame, SQLConf, Row}
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.Exchange
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.hbase.util.{HBaseKVHelper, BytesUtils}
+import org.apache.spark.sql.hbase.util.{BytesUtils, HBaseKVHelper}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row, SQLConf}
 
 class BulkLoadIntoTableSuite extends HBaseTestData {
   val sc: SparkContext = TestHbase.sparkContext
@@ -518,10 +518,10 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   }
 
   test("UNION TEST") {
-    aggregationTest1()
+    unionTest()
   }
 
-  def aggregationTest1(withCoprocessor: Boolean = true) = {
+  def unionTest(withCoprocessor: Boolean = true) = {
     val types0 = Seq(IntegerType, IntegerType, StringType)
     val types1 = Seq(IntegerType)
 
@@ -571,12 +571,51 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     TestHbase.sql("drop table spark_people")
     dropNativeHbaseTable("people")
   }
-  
-  def checkResult(df: DataFrame, containExchange:Boolean, size: Int) = {
+
+  test("SORT TEST") {
+    sortTest()
+  }
+
+  def sortTest(withCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+
+    val sql0 =
+      s"""CREATE TABLE spark_teacher_3key(
+          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
+          PRIMARY KEY(grade, class, subject))
+          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
+        .stripMargin
+    TestHbase.executeSql(sql0).toRdd.collect()
+
+    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
+    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
+    TestHbase.executeSql(loadSql0).toRdd.collect()
+
+    val result = runSql("select teacher_name from spark_teacher_3key order by grade limit 2")
+    val exparr = Array(Array("Zou"), Array("Peter"))
+    val res = {
+      for (rx <- exparr.indices)
+      yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
+    }.foldLeft(true) { case (res1, newres) => res1 && newres}
+    assert(res, "One or more rows did not match expected")
+
+    TestHbase.sql("drop table spark_teacher_3key")
+    dropNativeHbaseTable("teacher")
+  }
+
+  def checkResult(df: DataFrame, containExchange: Boolean, size: Int) = {
     df.queryExecution.executedPlan match {
-      case a:org.apache.spark.sql.execution.Aggregate =>
+      case a: org.apache.spark.sql.execution.Aggregate =>
         assert(a.child.isInstanceOf[Exchange] == containExchange)
-      case a:org.apache.spark.sql.execution.GeneratedAggregate =>
+      case a: org.apache.spark.sql.execution.GeneratedAggregate =>
         assert(a.child.isInstanceOf[Exchange] == containExchange)
       case _ => Nil
     }
