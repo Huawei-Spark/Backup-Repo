@@ -358,7 +358,7 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
 private[hbase] class DummyRDD(@transient sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) {
 
-  var result: Iterator[Row] = _
+  @transient var result: Iterator[Row] = _
 
   override def getPartitions = ???
 
