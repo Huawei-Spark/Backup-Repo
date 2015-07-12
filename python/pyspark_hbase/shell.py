@@ -28,8 +28,6 @@ import platform
 import py4j
 
 import pyspark
-from pyspark.context import SparkContext
-from pyspark.sql import SQLContext
 from pyspark_hbase.sql import HBaseSQLContext, context
 
 print("You are using Spark SQL on HBase!!!")
