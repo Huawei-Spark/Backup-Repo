@@ -428,7 +428,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   }
 
   test("group test for presplit table without coprocessor and codegen") {
-    aggregationTest(withCoprocessor = false)
+    aggregationTest(useCoprocessor = false)
   }
 
   test("group test for presplit table with codegen and coprocessor") {
@@ -441,11 +441,11 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   test("group test for presplit table with codegen but without coprocessor") {
     val originalValue = TestHbase.conf.codegenEnabled
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
-    aggregationTest(withCoprocessor = false)
+    aggregationTest(useCoprocessor = false)
     TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
   }
 
-  def aggregationTest(withCoprocessor: Boolean = true) = {
+  def aggregationTest(useCoprocessor: Boolean = true) = {
     val types = Seq(IntegerType, StringType, IntegerType)
 
     def generateRowKey(keys: Array[Any], length: Int = -1) = {
@@ -462,7 +462,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       generateRowKey(Array(4096, UTF8String("cc"), 0), 7),
       generateRowKey(Array(4096, UTF8String("cc"), 1000))
     )
-    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf"), splitKeys, withCoprocessor)
+    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf"), splitKeys, useCoprocessor)
 
     val sql1 =
       s"""CREATE TABLE testblk(col1 INT, col2 STRING, col3 INT, col4 STRING,
@@ -521,9 +521,23 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     unionTest()
   }
 
-  def unionTest(withCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
-    TestHbase.catalog.createHBaseUserTable("people", Set("cf"), null, withCoprocessor)
+  def unionTest(useCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+    val types1 = Seq(IntegerType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+    def generateRowKey1(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types1)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
+    TestHbase.catalog.createHBaseUserTable("people", Set("cf"), null, useCoprocessor)
 
     val sql0 =
       s"""CREATE TABLE spark_teacher_3key(
@@ -562,8 +576,16 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     sortTest()
   }
 
-  def sortTest(withCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+  def sortTest(useCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
 
     val sql0 =
       s"""CREATE TABLE spark_teacher_3key(
@@ -593,8 +615,16 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     TestRandom()
   }
 
-  def TestRandom(withCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+  def TestRandom(useCoprocessor: Boolean = true) = {
+    val types0 = Seq(IntegerType, IntegerType, StringType)
+
+    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
 
     val sql0 =
       s"""CREATE TABLE spark_teacher_3key(
@@ -620,8 +650,8 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     UnionParquetTableTest()
   }
 
-  def UnionParquetTableTest(withCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+  def UnionParquetTableTest(useCoprocessor: Boolean = true) = {
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
 
     val sql0 =
       s"""CREATE TABLE spark_teacher_3key(
@@ -653,8 +683,8 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     JoinParquetTableTest()
   }
 
-  def JoinParquetTableTest(withCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, withCoprocessor)
+  def JoinParquetTableTest(useCoprocessor: Boolean = true) = {
+    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
 
     val sql0 =
       s"""CREATE TABLE spark_teacher_3key(

@@ -96,7 +96,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
   protected[hbase] def createHBaseUserTable(tableName: String,
                                             families: Set[String],
                                             splitKeys: Array[Array[Byte]],
-                                            withCoprocessor: Boolean = true): Unit = {
+                                            useCoprocessor: Boolean = true): Unit = {
     val tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName))
     families.foreach(family => {
       val colDsc = new HColumnDescriptor(family)
@@ -104,7 +104,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
       tableDescriptor.addFamily(colDsc)
     })
 
-    if (deploySuccessfully.get && withCoprocessor) {
+    if (deploySuccessfully.get && useCoprocessor) {
       tableDescriptor.addCoprocessor(
         "org.apache.spark.sql.hbase.SparkSqlRegionObserver",
         null, Coprocessor.PRIORITY_USER, null)
@@ -182,7 +182,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
       .asInstanceOf[Seq[NonKeyColumn]]
     val families = nonKeyColumns.map(_.family).toSet
     if (!checkHBaseTableExists(hbaseTableName)) {
-      createHBaseUserTable(hbaseTableName, families, splitKeys)
+      createHBaseUserTable(hbaseTableName, families, splitKeys,
+        hbaseContext.conf.asInstanceOf[HBaseSQLConf].useCustomFilter)
     } else {
       families.foreach {
         case family =>
