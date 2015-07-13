@@ -72,8 +72,8 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
     if (!sqlContext.conf.asInstanceOf[HBaseSQLConf].useCoprocessor) {
       return plan
     }
-    var needToCreateSubplan: Boolean = false
     var needToCreateSubplanSeq: Seq[Boolean] = Seq()
+    def needToCreateSubplan = needToCreateSubplanSeq.nonEmpty && needToCreateSubplanSeq.last
     plan match {
       // If the plan is tableScan directly, we don't need to use coprocessor
       case HBaseSQLTableScan(_, _, _) => plan
@@ -81,37 +81,33 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       case _ =>
         val result = plan.transformUp {
           case scan: HBaseSQLTableScan if coprocessorIsAvailable(scan.relation) =>
-            needToCreateSubplanSeq :+= needToCreateSubplan
-            needToCreateSubplan = true
+            needToCreateSubplanSeq :+= true
             scan
 
           case scan: LeafNode =>
-            needToCreateSubplanSeq :+= needToCreateSubplan
-            needToCreateSubplan = false
+            needToCreateSubplanSeq :+= false
             scan
 
           // If subplan is needed then we need coprocessor plans for both children
           case node: SparkPlan if (node.children.size > 1) &&
-            (needToCreateSubplan || needToCreateSubplanSeq.contains(true)) =>
-            val newChildren = (needToCreateSubplanSeq :+ needToCreateSubplan)
-              .zip(node.children).map {
+            needToCreateSubplanSeq.contains(true) =>
+            val newChildren = needToCreateSubplanSeq.zip(node.children).map {
               case (ntcsp, child) =>
                 if (ntcsp) generateNewSubplan(child)
                 else child
             }
             needToCreateSubplanSeq = Seq()
-            needToCreateSubplan = false
             node.withNewChildren(newChildren)
 
           // Since the following two plans using shuffledRDD,
           // we could not pass them to the coprocessor.
           // Thus, their child are used as the subplan for coprocessor processing.
           case exchange: Exchange if needToCreateSubplan =>
-            needToCreateSubplan = false
+            needToCreateSubplanSeq = needToCreateSubplanSeq.init :+ false
             val newPlan = generateNewSubplan(exchange.child)
             exchange.withNewChildren(Seq(newPlan))
           case limit: Limit if needToCreateSubplan =>
-            needToCreateSubplan = false
+            needToCreateSubplanSeq = needToCreateSubplanSeq.init :+ false
             val newPlan = generateNewSubplan(limit.child)
             limit.withNewChildren(Seq(newPlan))
 
@@ -122,7 +118,7 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
           // For the computing in ParallelCollectionRDD, it needs ParallelCollectionPartition,
           // which we don't know how to transform from ourHBasePartition.
           case takeOrdered: TakeOrdered if needToCreateSubplan =>
-            needToCreateSubplan = false
+            needToCreateSubplanSeq = needToCreateSubplanSeq.init :+ false
             takeOrdered
         }
         // Use coprocessor even without shuffling
