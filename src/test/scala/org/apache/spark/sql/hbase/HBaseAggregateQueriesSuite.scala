@@ -17,7 +17,8 @@
 
 package org.apache.spark.sql.hbase
 
-class AggregateQueriesSuite extends HBaseTestData {
+class HBaseAggregateQueriesSuite extends
+TestBaseWithNonSplitData {
   var testnm = "Group by with cols in select list and with order by"
   test("Group by with cols in select list and with order by") {
     val query =

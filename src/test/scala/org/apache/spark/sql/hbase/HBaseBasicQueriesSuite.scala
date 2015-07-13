@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.hbase
 
-class BasicQueriesSuite extends HBaseTestData {
+class HBaseBasicQueriesSuite extends TestBaseWithNonSplitData {
   var testnm = "StarOperator * with limit"
   test("StarOperator * with limit") {
     val query1 =
@@ -106,7 +106,7 @@ class BasicQueriesSuite extends HBaseTestData {
       s"""SELECT doublecol AS double1, doublecol AS doublecol
              | FROM $TestTableName
              | WHERE doublecol > 5678912.345681 AND doublecol < 5678912.345683"""
-             .stripMargin
+        .stripMargin
 
     val result1 = runSql(query1)
     logInfo(s"$query1 came back with $result1.length results")

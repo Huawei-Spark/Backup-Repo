@@ -1,8 +1,6 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase._
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.sql.SQLContext
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -25,7 +23,7 @@ import org.apache.spark.sql.SQLContext
  * CreateTableAndLoadData
  *
  */
-class HBaseTestData extends HBaseIntegrationTestBase {
+class TestBaseWithNonSplitData extends TestBase {
   val TestTableName = "TestTable"
   val TestHBaseTableName: String = s"Hb$TestTableName"
   val TestHbaseColFamilies = Seq("cf1", "cf2")
@@ -55,30 +53,7 @@ class HBaseTestData extends HBaseIntegrationTestBase {
 
   override protected def afterAll() = {
     super.afterAll()
-    TestHbase.sql("DROP TABLE " + TestTableName)
-  }
-
-  def createNativeHbaseTable(tableName: String, families: Seq[String]) = {
-    val hbaseAdmin = TestHbase.hbaseAdmin
-    val hdesc = new HTableDescriptor(TableName.valueOf(tableName))
-    families.foreach { f => hdesc.addFamily(new HColumnDescriptor(f))}
-    try {
-      hbaseAdmin.createTable(hdesc)
-    } catch {
-      case e: TableExistsException =>
-        logError(s"Table already exists $tableName", e)
-    }
-  }
-
-  def dropNativeHbaseTable(tableName: String) = {
-    try {
-      val hbaseAdmin = TestHbase.hbaseAdmin
-      hbaseAdmin.disableTable(tableName)
-      hbaseAdmin.deleteTable(tableName)
-    } catch {
-      case e: TableExistsException =>
-        logError(s"Table already exists $tableName", e)
-    }
+    runSql("DROP TABLE " + TestTableName)
   }
 
   def createTable(tableName: String, hbaseTable: String, creationSQL: String) = {
@@ -99,23 +74,5 @@ class HBaseTestData extends HBaseIntegrationTestBase {
       case e: TableExistsException =>
         logInfo("IF NOT EXISTS still not implemented so we get the following exception", e)
     }
-  }
-
-  def loadData(tableName: String, loadFile: String) = {
-    // then load data into table
-    val loadSql = s"LOAD PARALL DATA LOCAL INPATH '$loadFile' INTO TABLE $tableName"
-    runSql(loadSql)
-  }
-
-  def s2b(s: String) = Bytes.toBytes(s)
-
-  def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
-    val result1 = runSql(sql)
-    assert(result1.length == exparr.length, s"$testName failed on size")
-    verify(testName,
-      sql,
-      for (rx <- exparr.indices)
-      yield result1(rx).toSeq, exparr
-    )
   }
 }

@@ -18,19 +18,30 @@
 
 package org.apache.spark.sql.hbase
 
+import java.io.File
 import java.util.Date
 
+import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, TableExistsException, TableName}
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
-abstract class HBaseIntegrationTestBase
+abstract class TestBase
   extends FunSuite with BeforeAndAfterAll with Logging {
   self: Suite =>
 
   val startTime = (new Date).getTime
+  val hbaseHome = {
+    val loader = this.getClass.getClassLoader
+    val url = loader.getResource("loadData.txt")
+    val file = new File(url.getPath)
+    val parent = file.getParentFile
+    parent.getAbsolutePath
+  }
+  if (hbaseHome == null || hbaseHome.isEmpty)
+    logError("Spark Home is not defined; may lead to unexpected error!")
 
   /**
    * Runs the plan and makes sure the answer matches the expected result.
@@ -87,7 +98,7 @@ abstract class HBaseIntegrationTestBase
     checkAnswer(rdd, Seq(expectedAnswer))
   }
 
-  def runSql(sql: String):Array[Row] = {
+  def runSql(sql: String): Array[Row] = {
     logInfo(sql)
     TestHbase.sql(sql).collect()
   }
@@ -106,9 +117,9 @@ abstract class HBaseIntegrationTestBase
           Math.abs(a - e) <= CompareTol
         case (a: Float, e: Float) =>
           Math.abs(a - e) <= CompareTol
-        case (a: Byte, e)  => true //For now, we assume it is ok
+        case (a: Byte, e) => true //For now, we assume it is ok
         case (a, e) =>
-          if(a == null && e == null) {
+          if (a == null && e == null) {
             logDebug(s"a=null e=null")
           } else {
             logDebug(s"atype=${a.getClass.getName} etype=${e.getClass.getName}")
@@ -132,5 +143,34 @@ abstract class HBaseIntegrationTestBase
     logInfo(s"$sql came back with ${result1.size} results")
     logInfo(result1.mkString)
     assert(res, "One or more rows did not match expected")
+  }
+
+  def createNativeHbaseTable(tableName: String, families: Seq[String]) = {
+    val hbaseAdmin = TestHbase.hbaseAdmin
+    val hdesc = new HTableDescriptor(TableName.valueOf(tableName))
+    families.foreach { f => hdesc.addFamily(new HColumnDescriptor(f))}
+    try {
+      hbaseAdmin.createTable(hdesc)
+    } catch {
+      case e: TableExistsException =>
+        logError(s"Table already exists $tableName", e)
+    }
+  }
+
+  def dropNativeHbaseTable(tableName: String) = {
+    try {
+      val hbaseAdmin = TestHbase.hbaseAdmin
+      hbaseAdmin.disableTable(tableName)
+      hbaseAdmin.deleteTable(tableName)
+    } catch {
+      case e: TableExistsException =>
+        logError(s"Table already exists $tableName", e)
+    }
+  }
+
+  def loadData(tableName: String, loadFile: String) = {
+    // then load data into table
+    val loadSql = s"LOAD PARALL DATA LOCAL INPATH '$loadFile' INTO TABLE $tableName"
+    runSql(loadSql)
   }
 }

@@ -20,7 +20,8 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SQLConf, _}
 
-class HBaseAdvancedSQLQuerySuite extends HBaseSplitTestData {
+class HBaseAdvancedSQLQuerySuite extends TestBaseWithSplitData {
+
   import org.apache.spark.sql.hbase.TestHbase._
   import org.apache.spark.sql.hbase.TestHbase.implicits._
 
@@ -41,7 +42,7 @@ class HBaseAdvancedSQLQuerySuite extends HBaseSplitTestData {
       tableA.where('col2 === 6).orderBy('col2.asc).select('col7),
       Row(-31) :: Nil)
   }
- 
+
   test("metadata is propagated correctly") {
     val tableA = sql("SELECT col7, col1, col3 FROM ta")
     val schema = tableA.schema

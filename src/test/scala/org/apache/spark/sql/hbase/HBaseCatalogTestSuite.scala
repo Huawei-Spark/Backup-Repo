@@ -20,11 +20,11 @@ import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.plans.logical.Subquery
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.util.HBaseKVHelper
 import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.sql.types._
 
-class CatalogTestSuite extends HBaseIntegrationTestBase {
+class HBaseCatalogTestSuite extends TestBase {
   val (catalog, configuration) = (TestHbase.catalog, TestHbase.sparkContext.hadoopConfiguration)
 
   test("Create Table") {

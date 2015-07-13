@@ -17,29 +17,13 @@
 
 package org.apache.spark.sql.hbase
 
-import java.io.File
-
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.expressions.GenericRow
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.Exchange
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.hbase.util.{BytesUtils, HBaseKVHelper}
+import org.apache.spark.sql.hbase.util.BytesUtils
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLConf}
 
-class BulkLoadIntoTableSuite extends HBaseTestData {
-  val sc: SparkContext = TestHbase.sparkContext
-  val hbaseHome = {
-    val loader = this.getClass.getClassLoader
-    val url = loader.getResource("loadData.txt")
-    val file = new File(url.getPath)
-    val parent = file.getParentFile
-    parent.getAbsolutePath
-  }
-  if (hbaseHome == null || hbaseHome.isEmpty)
-    logError("Spark Home is not defined; may lead to unexpected error!")
-
+class HBaseBulkLoadIntoTableSuite extends TestBase {
   // Test if we can parse 'LOAD DATA LOCAL INPATH './usr/file.txt' INTO TABLE tb1'
   test("bulk load parser test, local file") {
 
@@ -128,7 +112,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row6", "6", "12") :: Nil)
 
     // cleanup
-    TestHbase.sql(drop)
+    runSql(drop)
   }
 
   test("load parall data into hbase") {
@@ -173,7 +157,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row6", "6", "12") :: Nil)
 
     // cleanup
-    TestHbase.sql(drop)
+    runSql(drop)
   }
 
   test("load data with null column values into hbase") {
@@ -223,7 +207,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row4", null, null, null) :: Nil)
 
     // cleanup
-    TestHbase.sql(drop)
+    runSql(drop)
   }
 
   test("load parall data with null column values into hbase") {
@@ -275,7 +259,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row4", null, null, null) :: Nil)
 
     // cleanup
-    TestHbase.sql(drop)
+    runSql(drop)
   }
 
   test("load data on hbase table with more than 1 column family") {
@@ -310,7 +294,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row6", "6", "12") :: Nil)
 
     // cleanup
-    TestHbase.sql("drop table testblk")
+    runSql("drop table testblk")
     dropNativeHbaseTable("multi_cf_table")
 
   }
@@ -347,7 +331,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         Row("row6", "6", "12") :: Nil)
 
     // cleanup
-    TestHbase.sql("drop table testblk")
+    runSql("drop table testblk")
     dropNativeHbaseTable("multi_cf_table")
   }
 
@@ -383,7 +367,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     assert(TestHbase.sql("select * from testblk").collect().length == 16)
 
     // cleanup
-    TestHbase.sql("drop table testblk")
+    runSql("drop table testblk")
     dropNativeHbaseTable("presplit_table")
   }
 
@@ -416,310 +400,10 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().length == 16)
+    assert(runSql("select * from testblk").length == 16)
 
     // cleanup
-    TestHbase.sql("drop table testblk")
+    runSql("drop table testblk")
     dropNativeHbaseTable("presplit_table")
-  }
-
-  test("group test for presplit table with coprocessor but without codegen") {
-    aggregationTest()
-  }
-
-  test("group test for presplit table without coprocessor and codegen") {
-    aggregationTest(useCoprocessor = false)
-  }
-
-  test("group test for presplit table with codegen and coprocessor") {
-    val originalValue = TestHbase.conf.codegenEnabled
-    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
-    aggregationTest()
-    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
-  }
-
-  test("group test for presplit table with codegen but without coprocessor") {
-    val originalValue = TestHbase.conf.codegenEnabled
-    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
-    aggregationTest(useCoprocessor = false)
-    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
-  }
-
-  def aggregationTest(useCoprocessor: Boolean = true) = {
-    val types = Seq(IntegerType, StringType, IntegerType)
-
-    def generateRowKey(keys: Array[Any], length: Int = -1) = {
-      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types)
-      if (length < 0) completeRowKey
-      else completeRowKey.take(length)
-    }
-
-    val splitKeys: Array[HBaseRawType] = Array(
-      generateRowKey(Array(1024, UTF8String("0b"), 0), 3),
-      generateRowKey(Array(2048, UTF8String("cc"), 1024), 4),
-      generateRowKey(Array(4096, UTF8String("0a"), 0), 4),
-      generateRowKey(Array(4096, UTF8String("0b"), 1024), 7),
-      generateRowKey(Array(4096, UTF8String("cc"), 0), 7),
-      generateRowKey(Array(4096, UTF8String("cc"), 1000))
-    )
-    TestHbase.catalog.createHBaseUserTable("presplit_table", Set("cf"), splitKeys, useCoprocessor)
-
-    val sql1 =
-      s"""CREATE TABLE testblk(col1 INT, col2 STRING, col3 INT, col4 STRING,
-          PRIMARY KEY(col1, col2, col3))
-          MAPPED BY (presplit_table, COLS=[col4=cf.a])"""
-        .stripMargin
-
-    val executeSql1 = TestHbase.executeSql(sql1)
-    executeSql1.toRdd.collect()
-
-    val inputFile = "'" + hbaseHome + "/splitLoadData1.txt'"
-
-    // then load parall data into table
-    val loadSql = "LOAD PARALL DATA LOCAL INPATH " + inputFile + " INTO TABLE testblk"
-
-    val executeSql3 = TestHbase.executeSql(loadSql)
-    executeSql3.toRdd.collect()
-
-    var sql = "select col1,col3 from testblk where col1 < 4096 group by col3,col1"
-    checkResult(TestHbase.sql(sql), containExchange = true, 3)
-
-    sql = "select col1,col2,col3 from testblk group by col1,col2,col3"
-    checkResult(TestHbase.sql(sql), containExchange = false, 7)
-
-    sql = "select col1,col2,col3,count(*) from testblk group by col1,col2,col3,col1+col3"
-    checkResult(TestHbase.sql(sql), containExchange = false, 7) //Sprecial case
-
-    sql = "select count(*) from testblk group by col1+col3"
-    checkResult(TestHbase.sql(sql), containExchange = true, 5)
-
-    sql = "select col1,col2 from testblk where col1 < 4096 group by col1,col2"
-    checkResult(TestHbase.sql(sql), containExchange = false, 3)
-
-    sql = "select col1,col2 from testblk where (col1 = 4096 and col2 < 'cc') group by col1,col2"
-    checkResult(TestHbase.sql(sql), containExchange = true, 2)
-
-    sql = "select col1 from testblk where col1 < 4096 group by col1"
-    checkResult(TestHbase.sql(sql), containExchange = false, 3)
-
-    val result = runSql("select avg(col3) from testblk where col1 < 4096 group by col1")
-    assert(result.length == 3)
-    val exparr = Array(Array(1024.0), Array(0.0), Array(1024.0))
-
-    val res = {
-      for (rx <- exparr.indices)
-      yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
-    }.foldLeft(true) { case (res1, newres) => res1 && newres}
-    assert(res, "One or more rows did not match expected")
-
-    // cleanup
-    TestHbase.sql("drop table testblk")
-    dropNativeHbaseTable("presplit_table")
-  }
-
-  test("UNION TEST") {
-    unionTest()
-  }
-
-  def unionTest(useCoprocessor: Boolean = true) = {
-    val types0 = Seq(IntegerType, IntegerType, StringType)
-    val types1 = Seq(IntegerType)
-
-    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
-      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
-      if (length < 0) completeRowKey
-      else completeRowKey.take(length)
-    }
-    def generateRowKey1(keys: Array[Any], length: Int = -1) = {
-      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types1)
-      if (length < 0) completeRowKey
-      else completeRowKey.take(length)
-    }
-
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
-    TestHbase.catalog.createHBaseUserTable("people", Set("cf"), null, useCoprocessor)
-
-    val sql0 =
-      s"""CREATE TABLE spark_teacher_3key(
-          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
-          PRIMARY KEY(grade, class, subject))
-          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
-        .stripMargin
-    TestHbase.executeSql(sql0).toRdd.collect()
-    val sql1 =
-      s"""CREATE TABLE spark_people(
-          rowNum INT, people_name STRING, people_age INT,
-          school_identification STRING, school_director STRING,
-          PRIMARY KEY(rowNum))
-          MAPPED BY (people, COLS=[people_name=cf.a, people_age=cf.b,
-          school_identification=cf.c, school_director=cf.d])"""
-        .stripMargin
-    TestHbase.executeSql(sql1).toRdd.collect()
-
-    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
-    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
-    TestHbase.executeSql(loadSql0).toRdd.collect()
-    val inputFile1 = "'" + hbaseHome + "/people.txt'"
-    val loadSql1 = "LOAD PARALL DATA LOCAL INPATH " + inputFile1 + " INTO TABLE spark_people"
-    TestHbase.executeSql(loadSql1).toRdd.collect()
-
-    val sql = "select people_name from spark_people union select teacher_name from spark_teacher_3key"
-    checkResult(TestHbase.sql(sql), containExchange = true, 4)
-
-    TestHbase.sql("drop table spark_teacher_3key")
-    dropNativeHbaseTable("teacher")
-    TestHbase.sql("drop table spark_people")
-    dropNativeHbaseTable("people")
-  }
-
-  test("SORT TEST") {
-    sortTest()
-  }
-
-  def sortTest(useCoprocessor: Boolean = true) = {
-    val types0 = Seq(IntegerType, IntegerType, StringType)
-
-    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
-      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
-      if (length < 0) completeRowKey
-      else completeRowKey.take(length)
-    }
-
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
-
-    val sql0 =
-      s"""CREATE TABLE spark_teacher_3key(
-          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
-          PRIMARY KEY(grade, class, subject))
-          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
-        .stripMargin
-    TestHbase.executeSql(sql0).toRdd.collect()
-
-    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
-    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
-    TestHbase.executeSql(loadSql0).toRdd.collect()
-
-    val result = runSql("select teacher_name from spark_teacher_3key order by grade limit 2")
-    val exparr = Array(Array("Zou"), Array("Peter"))
-    val res = {
-      for (rx <- exparr.indices)
-      yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
-    }.foldLeft(true) { case (res1, newres) => res1 && newres}
-    assert(res, "One or more rows did not match expected")
-
-    TestHbase.sql("drop table spark_teacher_3key")
-    dropNativeHbaseTable("teacher")
-  }
-
-  test("TEST Random") {
-    TestRandom()
-  }
-
-  def TestRandom(useCoprocessor: Boolean = true) = {
-    val types0 = Seq(IntegerType, IntegerType, StringType)
-
-    def generateRowKey0(keys: Array[Any], length: Int = -1) = {
-      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types0)
-      if (length < 0) completeRowKey
-      else completeRowKey.take(length)
-    }
-
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
-
-    val sql0 =
-      s"""CREATE TABLE spark_teacher_3key(
-          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
-          PRIMARY KEY(grade, class, subject))
-          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
-        .stripMargin
-    TestHbase.executeSql(sql0).toRdd.collect()
-
-    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
-    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
-    TestHbase.executeSql(loadSql0).toRdd.collect()
-
-    val df: DataFrame = TestHbase.table("spark_teacher_3key")
-    import org.apache.spark.sql.functions._
-    df.select(col("*"), randn(5L)).show()
-
-    TestHbase.sql("drop table spark_teacher_3key")
-    dropNativeHbaseTable("teacher")
-  }
-
-  test("Union Parquet Table Test") {
-    UnionParquetTableTest()
-  }
-
-  def UnionParquetTableTest(useCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
-
-    val sql0 =
-      s"""CREATE TABLE spark_teacher_3key(
-          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
-          PRIMARY KEY(grade, class, subject))
-          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
-        .stripMargin
-    TestHbase.executeSql(sql0).toRdd.collect()
-
-    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
-    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
-    TestHbase.executeSql(loadSql0).toRdd.collect()
-
-    val outputFile = hbaseHome + "/users.parquet"
-    val parquetTable = TestHbase.read.parquet(outputFile)
-    parquetTable.registerTempTable("parquetTable")
-
-    val sql =
-      """select * from (
-        |select teacher_name from spark_teacher_3key t1
-        |union all select name from parquetTable) t3""".stripMargin
-    checkResult(TestHbase.sql(sql), containExchange = true, 5)
-
-    TestHbase.sql("drop table spark_teacher_3key")
-    dropNativeHbaseTable("teacher")
-  }
-
-  test("Join Parquet Table Table") {
-    JoinParquetTableTest()
-  }
-
-  def JoinParquetTableTest(useCoprocessor: Boolean = true) = {
-    TestHbase.catalog.createHBaseUserTable("teacher", Set("cf"), null, useCoprocessor)
-
-    val sql0 =
-      s"""CREATE TABLE spark_teacher_3key(
-          grade INT, class INT, subject STRING, teacher_name STRING, teacher_age INT,
-          PRIMARY KEY(grade, class, subject))
-          MAPPED BY (teacher, COLS=[teacher_name=cf.a, teacher_age=cf.b])"""
-        .stripMargin
-    TestHbase.executeSql(sql0).toRdd.collect()
-
-    val inputFile0 = "'" + hbaseHome + "/teacher.txt'"
-    val loadSql0 = "LOAD PARALL DATA LOCAL INPATH " + inputFile0 + " INTO TABLE spark_teacher_3key"
-    TestHbase.executeSql(loadSql0).toRdd.collect()
-
-    val outputFile = hbaseHome + "/users.parquet"
-    val parquetTable = TestHbase.read.parquet(outputFile)
-    parquetTable.registerTempTable("parquetTable")
-
-    val sql =
-      """select * from spark_teacher_3key
-        |join parquetTable where parquetTable.name="Bruce"
-        |or parquetTable.favorite_color="Blue" """.stripMargin
-    checkResult(TestHbase.sql(sql), containExchange = true, 4)
-
-    TestHbase.sql("drop table spark_teacher_3key")
-    dropNativeHbaseTable("teacher")
-  }
-
-  def checkResult(df: DataFrame, containExchange: Boolean, size: Int) = {
-    df.queryExecution.executedPlan match {
-      case a: org.apache.spark.sql.execution.Aggregate =>
-        assert(a.child.isInstanceOf[Exchange] == containExchange)
-      case a: org.apache.spark.sql.execution.GeneratedAggregate =>
-        assert(a.child.isInstanceOf[Exchange] == containExchange)
-      case _ => Nil
-    }
-    assert(df.collect().length == size)
   }
 }

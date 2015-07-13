@@ -23,15 +23,14 @@ import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.catalyst.expressions.{GenericRow, Row}
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils, HBaseKVHelper}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils}
 
 /**
  * HBaseMainTest
  * create HbTestTable and metadata table, and insert some data
  */
-class HBaseSplitTestData extends HBaseIntegrationTestBase
-{
+class TestBaseWithSplitData extends TestBase {
   val TableName_a: String = "ta"
   val TableName_b: String = "tb"
   val HbaseTableName: String = "ht"
@@ -45,8 +44,8 @@ class HBaseSplitTestData extends HBaseIntegrationTestBase
   }
 
   override protected def afterAll() = {
-    TestHbase.sql("DROP TABLE " + TableName_a)
-    TestHbase.sql("DROP TABLE " + TableName_b)
+    runSql("DROP TABLE " + TableName_a)
+    runSql("DROP TABLE " + TableName_b)
   }
 
   def createTable(useMultiplePartitions: Boolean) = {
@@ -87,7 +86,7 @@ class HBaseSplitTestData extends HBaseIntegrationTestBase
 
       TestHbase.catalog.createTable(TableName_a, null, HbaseTableName, allColumns, splitKeys)
 
-      TestHbase.sql( s"""CREATE TABLE $TableName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
+      runSql( s"""CREATE TABLE $TableName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
           col5 LONG, col6 FLOAT, col7 INTEGER, PRIMARY KEY(col7, col1, col3))
           MAPPED BY ($HbaseTableName, COLS=[col2=cf1.cq11, col4=cf1.cq12, col5=cf2.cq21,
           col6=cf2.cq22])""".stripMargin)

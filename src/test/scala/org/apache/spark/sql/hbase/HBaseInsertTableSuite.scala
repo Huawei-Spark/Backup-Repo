@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.Row
 
-class HBaseInsertTableSuite extends HBaseTestData {
+class HBaseInsertTableSuite extends TestBaseWithNonSplitData {
 
   var testnm = "Insert all rows to the table from other table"
   test("Insert all rows to the table from other table") {

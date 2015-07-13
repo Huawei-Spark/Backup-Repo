@@ -22,7 +22,7 @@ import org.apache.hadoop.hbase._
 /**
  * This is a custom filter test suite running against mini-cluster
  */
-class CFTestSuite extends HBaseIntegrationTestBase {
+class HBaseCFTestSuite extends TestBase {
   private val tableName = "cf"
   private val hbaseTableName = "cf_htable"
   private val hbaseFamilies = Seq("f")

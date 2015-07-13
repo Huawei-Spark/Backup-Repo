@@ -18,15 +18,16 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.util.{BytesUtils, HBaseKVHelper}
+import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
 
-class HBasePartitionerSuite extends HBaseIntegrationTestBase {
-  val sc = TestHbase.sparkContext
+class HBasePartitionerSuite extends TestBase {
+  val sc: SparkContext = TestHbase.sparkContext
 
   test("test hbase partitioner") {
     val data = (1 to 40).map { r =>

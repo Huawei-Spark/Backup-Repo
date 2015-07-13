@@ -22,7 +22,7 @@ import org.apache.hadoop.hbase._
 /**
  * This is a mini tpc test suite running against mini-cluster
  */
-class TpcMiniTestSuite extends HBaseIntegrationTestBase {
+class HBaseTpcMiniTestSuite extends TestBase {
   private val tableName = "store_sales"
   private val hbaseTableName = "store_sales_htable"
   private val hbaseFamilies = Seq("f")

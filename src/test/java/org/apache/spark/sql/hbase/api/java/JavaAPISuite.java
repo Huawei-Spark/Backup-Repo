@@ -25,14 +25,13 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.hbase.*;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Row;
 
-public class JavaAPISuite extends HBaseIntegrationTestBase implements Serializable {
+public class JavaAPISuite extends TestBase implements Serializable {
     private transient JavaSparkContext sc;
     private transient SQLContext hsc;
     private transient MiniHBaseCluster cluster;

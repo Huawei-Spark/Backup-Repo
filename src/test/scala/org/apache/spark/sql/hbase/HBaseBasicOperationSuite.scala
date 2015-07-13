@@ -20,7 +20,8 @@ package org.apache.spark.sql.hbase
 /**
  * Test insert / query against the table
  */
-class HBaseBasicOperationSuite extends HBaseSplitTestData {
+class HBaseBasicOperationSuite extends TestBaseWithSplitData {
+
   import org.apache.spark.sql.hbase.TestHbase._
 
   override def afterAll() = {
