@@ -183,7 +183,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
     val families = nonKeyColumns.map(_.family).toSet
     if (!checkHBaseTableExists(hbaseTableName)) {
       createHBaseUserTable(hbaseTableName, families, splitKeys,
-        hbaseContext.conf.asInstanceOf[HBaseSQLConf].useCustomFilter)
+        hbaseContext.conf.asInstanceOf[HBaseSQLConf].useCoprocessor)
     } else {
       families.foreach {
         case family =>
