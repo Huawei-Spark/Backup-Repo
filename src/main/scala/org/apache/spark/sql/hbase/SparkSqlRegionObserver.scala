@@ -168,13 +168,6 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
         taskContext)
 
       new BaseRegionScanner() {
-        var initialized = TaskContext.get != null
-
-        def init() = {
-          TaskContext.setTaskContext(taskContext)
-          initialized = true
-        }
-
         override def getRegionInfo: HRegionInfo = regionInfo
 
         override def getMaxResultSize: Long = s.getMaxResultSize
@@ -184,7 +177,6 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
         override def next(results: java.util.List[Cell]): Boolean = {
           val hasMore: Boolean = result.hasNext
           if (hasMore) {
-            if (!initialized) init()
             val nextRow = result.next()
             val numOfCells = outputDataType.length
             for (i <- 0 until numOfCells) {

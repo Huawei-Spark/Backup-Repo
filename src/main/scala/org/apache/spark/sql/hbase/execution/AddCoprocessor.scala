@@ -18,6 +18,8 @@
 package org.apache.spark.sql.hbase.execution
 
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.expressions._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.hbase._
@@ -120,6 +122,35 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
           case takeOrdered: TakeOrdered if needToCreateSubplan =>
             needToCreateSubplanSeq = needToCreateSubplanSeq.init :+ false
             takeOrdered
+
+          // The following expressions contain 'TaskContext.get().partitionId()'
+          // And, in coprocessor, 'TaskContext.get()' might be null.
+          //
+          // Thus, for the project contains those expressions,
+          // we will process them without coprocessor.
+          case proj: Project if needToCreateSubplan => {
+            val foundExprShouldBeSkipped = proj.expressions.exists(exp => {
+              var found = false
+              exp transform {
+                case r: Randn =>
+                  found = true
+                  r
+                case m: MonotonicallyIncreasingID =>
+                  found = true
+                  m
+                // The expression, 'SparkPartitionID', also contains 'TaskContext.get()'
+                // However, we think it can only be access via DataFrame.
+                // Hence, we comment it out.
+                //
+                // case s:SparkPartitionID => s
+              }
+              found
+            })
+            if (foundExprShouldBeSkipped) {
+              needToCreateSubplanSeq = needToCreateSubplanSeq.init :+ false
+            }
+            proj
+          }
         }
         // Use coprocessor even without shuffling
         if (needToCreateSubplan) generateNewSubplan(result) else result
