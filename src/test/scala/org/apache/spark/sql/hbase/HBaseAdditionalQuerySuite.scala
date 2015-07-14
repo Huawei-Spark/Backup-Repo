@@ -17,16 +17,15 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.spark.sql.execution.Exchange
-import org.apache.spark.sql.{SQLConf, DataFrame}
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.GenericRow
+import org.apache.spark.sql.execution.Exchange
 import org.apache.spark.sql.hbase.util.HBaseKVHelper
 import org.apache.spark.sql.types._
 
 class HBaseAdditionalQuerySuite extends TestBase {
 
   override protected def beforeAll() = {
-    createTableTestblk()
     createTableTeacher()
     createTablePeople()
     createTableFromParquet()
@@ -102,7 +101,6 @@ class HBaseAdditionalQuerySuite extends TestBase {
   }
 
   override protected def afterAll() = {
-    dropTableTestblk()
     dropTableTeacher()
     dropTablePeople()
   }
@@ -124,12 +122,12 @@ class HBaseAdditionalQuerySuite extends TestBase {
 
   test("UNION TEST") {
     val sql = "select people_name from spark_people union select teacher_name from spark_teacher_3key"
-    checkResult(TestHbase.sql(sql), containExchange = true, 4)
+    checkResult(TestHbase.sql(sql), containExchange = true, 7)
   }
 
   test("SORT TEST") {
     val result = runSql("select teacher_name from spark_teacher_3key order by grade limit 2")
-    val exparr = Array(Array("Zou"), Array("Peter"))
+    val exparr = Array(Array("teacher_1_1_1"), Array("teacher_1_2_1"))
     val res = {
       for (rx <- exparr.indices)
       yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
@@ -140,7 +138,7 @@ class HBaseAdditionalQuerySuite extends TestBase {
   test("TEST Random") {
     val df: DataFrame = TestHbase.table("spark_teacher_3key")
     import org.apache.spark.sql.functions._
-    assert(df.select(col("*"), randn(5L)).collect().size == 2)
+    assert(df.select(col("*"), randn(5L)).collect().size == 12)
   }
 
   test("Union Parquet Table Test") {
@@ -148,7 +146,7 @@ class HBaseAdditionalQuerySuite extends TestBase {
       """select * from (
         |select teacher_name from spark_teacher_3key t1
         |union all select name from parquetTable) t3""".stripMargin
-    checkResult(TestHbase.sql(sql), containExchange = true, 5)
+    checkResult(TestHbase.sql(sql), containExchange = true, 15)
   }
 
   test("Join Parquet Table Table") {
@@ -156,7 +154,31 @@ class HBaseAdditionalQuerySuite extends TestBase {
       """select * from spark_teacher_3key
         |join parquetTable where parquetTable.name="Bruce"
         |or parquetTable.favorite_color="Blue" """.stripMargin
-    checkResult(TestHbase.sql(sql), containExchange = true, 4)
+    checkResult(TestHbase.sql(sql), containExchange = true, 24)
+  }
+
+  test("NO Coprocessor and No CustomerFilter Test") {
+    val origValOfCoprocessor = TestHbase.conf.getConf(HBaseSQLConf.USE_COPROCESSOR, "true")
+    val origValOfCustomfilter = TestHbase.conf.getConf(HBaseSQLConf.USE_CUSTOMFILTER, "true")
+
+    TestHbase.setConf(HBaseSQLConf.USE_COPROCESSOR, "false")
+    TestHbase.setConf(HBaseSQLConf.USE_CUSTOMFILTER, "false")
+
+    val r1 = runSql(
+      "select grade,class, subject , teacher_name, teacher_age from spark_teacher_3key where grade = 1 or class < 3")
+    assert(r1.size == 12)
+
+    val r2 = runSql(
+      "select school_identification from spark_people where school_director is null")
+    assert(r2.size == 2)
+
+    TestHbase.setConf(HBaseSQLConf.USE_COPROCESSOR, origValOfCoprocessor)
+    TestHbase.setConf(HBaseSQLConf.USE_CUSTOMFILTER, origValOfCustomfilter)
+  }
+
+  test("DataFrame Test") {
+    val teachers: DataFrame = TestHbase.sql("Select * from spark_teacher_3key")
+    teachers.orderBy(Column("grade").asc, Column("class").asc).show(3)
   }
 
   test("group test for presplit table with coprocessor but without codegen") {
@@ -182,6 +204,8 @@ class HBaseAdditionalQuerySuite extends TestBase {
   }
 
   def aggregationTest(useCoprocessor: Boolean = true) = {
+    createTableTestblk(useCoprocessor = useCoprocessor)
+
     var sql = "select col1,col3 from testblk where col1 < 4096 group by col3,col1"
     checkResult(TestHbase.sql(sql), containExchange = true, 3)
 
@@ -212,6 +236,8 @@ class HBaseAdditionalQuerySuite extends TestBase {
       yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
+
+    dropTableTestblk()
   }
 
   def checkResult(df: DataFrame, containExchange: Boolean, size: Int) = {

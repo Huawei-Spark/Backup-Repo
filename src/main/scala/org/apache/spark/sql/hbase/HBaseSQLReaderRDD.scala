@@ -146,7 +146,7 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
     val finalOutput = if (hasSubPlan) {
       subplan.get.output
     } else if (otherFilters.isDefined) {
-      output.distinct.union(otherFilters.get.references.toSeq)
+      output.union(otherFilters.get.references.toSeq).distinct
     } else {
       output.distinct
     }
@@ -251,7 +251,13 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
         otherFilters, useCustomFilter, output)
       if (hasSubPlan) setCoprocessor(scan, otherFilters, split.index)
       val scanner = relation.htable.getScanner(scan)
-      createIterator(context, scanner, None)
+      if ((useCustomFilter || hasSubPlan) && deploySuccessfully.getOrElse(false)) {
+        // other filters will be evaluated as part of a custom filter
+        // or nonexistent in post coprocessor execution
+        createIterator(context, scanner, None)
+      } else {
+        createIterator(context, scanner, otherFilters)
+      }
     } else {
       // expandedCPRs is not empty
       val isPointRanges = expandedCPRs.forall(
@@ -348,8 +354,7 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
           otherFilters, useCustomFilter, output)
         if (hasSubPlan) setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
-        if ((useCustomFilter || hasSubPlan) && deploySuccessfully.isDefined
-          && deploySuccessfully.get) {
+        if ((useCustomFilter || hasSubPlan) && deploySuccessfully.getOrElse(false)) {
           // other filters will be evaluated as part of a custom filter
           // or nonexistent in post coprocessor execution
           createIterator(context, scanner, None)
