@@ -106,6 +106,18 @@ class HBaseBasicOperationSuite extends TestBaseWithSplitData {
   test("Select test 2 (WHERE)") {
     assert(sql( """SELECT * FROM ta WHERE col7 > 128""").count() == 3)
     assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").collect().length == 1)
+    assert(sql( """SELECT * FROM ta WHERE (col7  > 1) AND (col7 < 1)""").collect().length == 0)
+    assert(sql( """SELECT * FROM ta WHERE (col7  > 1) OR (col7 < 1)""").collect().length == 13)
+    assert(sql(
+      """SELECT * FROM ta WHERE
+        |((col7 = 1) AND (col1 < ' p255 ') AND (col1 > ' p255 ')) OR
+        |((col7 = 2) AND (col1 < ' p255 ') AND (col1 > ' p255 '))
+      """.stripMargin).collect().length == 0)
+    assert(sql(
+      """SELECT * FROM ta WHERE
+        |((col7 = 1) AND (col3 < 128) AND (col3 > 128)) OR
+        |((col7 = 2) AND (col3 < 127) AND (col3 > 127))
+      """.stripMargin).collect().length == 0)
   }
 
   test("Select test 3 (ORDER BY)") {
