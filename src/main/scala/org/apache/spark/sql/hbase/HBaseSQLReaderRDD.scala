@@ -242,7 +242,7 @@ class HBaseSQLReaderRDD(val relation: HBaseRelation,
     val partition = split.asInstanceOf[HBasePartition]
     val predicate = partition.computePredicate(relation)
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      RangeCriticalPoint.generateCriticalPointRanges(relation, predicate).
+      RangeCriticalPoint.generateCriticalPointRanges(relation, predicate)._2.
         flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {

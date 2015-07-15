@@ -71,13 +71,13 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 3)
-    assert(cprs.head.start.get == 512 && cprs.head.startInclusive
-      && cprs.head.end.get == 512 && cprs.head.endInclusive)
-    assert(cprs(1).start.get == 1024 && cprs(1).startInclusive
-      && cprs(1).end.get == 1024 && cprs(1).endInclusive)
-    assert(cprs(2).start.get == 2048 && cprs(2).startInclusive
-      && cprs(2).end.isEmpty && !cprs(2).endInclusive)
+    assert(cprs._2.size == 3)
+    assert(cprs._2.head.start.get == 512 && cprs._2.head.startInclusive
+      && cprs._2.head.end.get == 512 && cprs._2.head.endInclusive)
+    assert(cprs._2(1).start.get == 1024 && cprs._2(1).startInclusive
+      && cprs._2(1).end.get == 1024 && cprs._2(1).endInclusive)
+    assert(cprs._2(2).start.get == 2048 && cprs._2(2).startInclusive
+      && cprs._2(2).end.isEmpty && !cprs._2(2).endInclusive)
   }
 
   test("Generate CP Ranges 1") {
@@ -110,11 +110,11 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 2)
-    assert(cprs.head.start.get == 513L && cprs.head.startInclusive
-      && cprs.head.end.get == 1023L && cprs.head.endInclusive)
-    assert(cprs(1).start.get == 1025L && cprs(1).startInclusive
-      && cprs(1).end.isEmpty && !cprs(1).endInclusive)
+    assert(cprs._2.size == 2)
+    assert(cprs._2.head.start.get == 513L && cprs._2.head.startInclusive
+      && cprs._2.head.end.get == 1023L && cprs._2.head.endInclusive)
+    assert(cprs._2(1).start.get == 1025L && cprs._2(1).startInclusive
+      && cprs._2(1).end.isEmpty && !cprs._2(1).endInclusive)
   }
 
   test("Generate CP Ranges 2") {
@@ -144,9 +144,9 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 1)
-    assert(cprs.head.start.get == "aaa" && cprs.head.startInclusive
-      && cprs.head.end.get == "aaa" && cprs.head.endInclusive)
+    assert(cprs._2.size == 1)
+    assert(cprs._2.head.start.get == "aaa" && cprs._2.head.startInclusive
+      && cprs._2.head.end.get == "aaa" && cprs._2.head.endInclusive)
   }
 
   test("Generate CP Ranges for Multi-Dimension 0") {
@@ -186,9 +186,9 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
-    assert(cprs.size == 2)
+    assert(cprs._2.size == 2)
     assert(expandedCPRs.size == 2)
 
     val prefix0 = expandedCPRs.head.prefix
@@ -248,9 +248,9 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
-    assert(cprs.size == 2)
+    assert(cprs._2.size == 2)
     assert(expandedCPRs.size == 4)
 
     val prefix0 = expandedCPRs.head.prefix
@@ -313,10 +313,10 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 2)
+    assert(cprs._2.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
 
@@ -394,10 +394,10 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 2)
+    assert(cprs._2.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
 
@@ -486,10 +486,10 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 2)
+    assert(cprs._2.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 2)
 
@@ -577,10 +577,10 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 1)
+    assert(cprs._2.size == 1)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      cprs._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 1)
 

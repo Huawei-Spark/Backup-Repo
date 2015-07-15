@@ -68,6 +68,9 @@ private[hbase] class CriticalPointRange[+T](start: Option[T], startInclusive: Bo
                                            dt: AtomicType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt) {
   var nextDimCriticalPointRanges: Seq[CriticalPointRange[_]] = Nil
+  // this CPR is invalid, meaning its children are all excluded, different from
+  // an empty children list which means no predicate applicable to the next dimension
+  var invalid = false
 
   /**
    * expand on nested critical point ranges of sub-dimensions
@@ -76,13 +79,14 @@ private[hbase] class CriticalPointRange[+T](start: Option[T], startInclusive: Bo
    */
   private[hbase] def flatten(prefix: ArrayBuffer[(Any, AtomicType)])
   : Seq[MDCriticalPointRange[_]] = {
-    if (nextDimCriticalPointRanges.isEmpty) {
-      // Leaf node
-      Seq(new MDCriticalPointRange(prefix.toSeq, this, dt))
-    } else {
-      prefix += ((start.get, dt))
-      require(isPoint, "Internal Logical Error: point range expected")
-      nextDimCriticalPointRanges.map(_.flatten(prefix.clone())).reduceLeft(_ ++ _)
+    (nextDimCriticalPointRanges, invalid) match {
+      case (Nil, true) => Nil
+      case (Nil, false) => Seq(new MDCriticalPointRange(prefix.toSeq, this, dt))
+      case _ => {
+        prefix += ((start.get, dt))
+        require(isPoint, "Internal Logical Error: point range expected")
+        nextDimCriticalPointRanges.map(_.flatten(prefix.clone())).reduceLeft(_ ++ _)
+      }
     }
   }
 
@@ -402,11 +406,11 @@ object RangeCriticalPoint {
    * Step 1: generate critical point ranges for a particular dimension
    * @param relation the HBase relation
    * @param pred the predicate expression to work on
-   * @return a list of critical point ranges
+   * @return whether no valid CPRs, plus a list of critical point ranges
    */
   private[hbase] def generateCriticalPointRanges(relation: HBaseRelation, pred: Option[Expression])
-  : Seq[CriticalPointRange[_]] = {
-    if (pred.isEmpty) Nil
+  : (Boolean, Seq[CriticalPointRange[_]]) = {
+    if (pred.isEmpty) (false, Nil)
     else {
       val predExpr = pred.get
       val predRefs = predExpr.references.toSeq
@@ -423,21 +427,21 @@ object RangeCriticalPoint {
    * @param dimIndex the dimension index
    * @param row a row for partial reduction
    * @param predRefs the references in the predicate expression
-   * @return a list of critical point ranges
+   * @return whether this CPR has all chidren invalid, plus a list of critical point ranges
    */
   private[hbase] def generateCriticalPointRangesHelper(relation: HBaseRelation,
                                                        predExpr: Expression,
                                                        dimIndex: Int,
                                                        row: MutableRow,
                                                        predRefs: Seq[Attribute])
-  : Seq[CriticalPointRange[_]] = {
+  : (Boolean, Seq[CriticalPointRange[_]]) = {
     val keyDim = relation.partitionKeys(dimIndex)
     val boundPred = BindReferences.bindReference(predExpr, predRefs)
     val dt: AtomicType = keyDim.dataType.asInstanceOf[AtomicType]
     // Step 1.1
     val criticalPoints: Seq[CriticalPoint[dt.InternalType]]
     = collect(predExpr, relation.partitionKeys(dimIndex))
-    if (criticalPoints.isEmpty) Nil
+    if (criticalPoints.isEmpty) (false, Nil)
     else {
       val cpRanges: Seq[CriticalPointRange[dt.InternalType]]
       = generateCriticalPointRange[dt.InternalType](criticalPoints, dimIndex, dt)
@@ -450,20 +454,30 @@ object RangeCriticalPoint {
         prRes._1 == null || prRes._1.asInstanceOf[Boolean]
       })
 
+      if (!cpRanges.isEmpty && qualifiedCPRanges.isEmpty) {
+        // all children are disqualified
+        (true, Nil)
+      }
+
       // Step 1.3
       if (dimIndex < relation.partitionKeys.size - 1) {
         // For point range, generate CPs for the next dim
         qualifiedCPRanges.foreach(cpr => {
           if (cpr.isPoint && cpr.pred != null) {
-            cpr.nextDimCriticalPointRanges = generateCriticalPointRangesHelper(relation,
-              cpr.pred, dimIndex + 1, row, predRefs)
+            val (invalid, nextDimCPR) =
+              generateCriticalPointRangesHelper(relation, cpr.pred, dimIndex + 1, row, predRefs)
+            cpr.invalid = invalid
+            cpr.nextDimCriticalPointRanges = nextDimCPR
           }
         })
+
+        // If all child CPRs are invalid, this CPR is invalid.
+        if (!qualifiedCPRanges.exists(!_.invalid)) return (true, Nil)
       }
       // Update row(keyIndex) to null for future reuse
       row.update(keyIndex, null)
 
-      qualifiedCPRanges
+      (false, qualifiedCPRanges)
     }
   }
 
@@ -702,14 +716,18 @@ object RangeCriticalPoint {
     if (pred.isEmpty) relation.partitions
     else {
       // Step 1
-      val cprs: Seq[CriticalPointRange[_]] = generateCriticalPointRanges(relation, pred)
+      val (invalid, cprs): (Boolean, Seq[CriticalPointRange[_]]) = generateCriticalPointRanges(relation, pred)
 
-      // Step 2
-      val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-        cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      if (invalid) {
+        Nil
+      } else {
+        // Step 2
+        val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+          cprs.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+        // Step 3
 
-      // Step 3
-      prunePartitions(expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
+        prunePartitions(expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
+      }
     }
   }
 }

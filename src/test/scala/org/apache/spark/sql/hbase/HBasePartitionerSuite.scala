@@ -135,10 +135,10 @@ class HBasePartitionerSuite extends TestBase {
 
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(result.size == 2)
+    assert(result._2.size == 2)
 
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      result.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
+      result._2.flatMap(_.flatten(new ArrayBuffer[(Any, AtomicType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
 
@@ -250,7 +250,7 @@ class HBasePartitionerSuite extends TestBase {
 
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(result.size == 2)
+    assert(result._2.size == 2)
   }
 
   test("test k < 8 AND k > 8 (k is int)") {
@@ -284,6 +284,6 @@ class HBasePartitionerSuite extends TestBase {
 
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(result.isEmpty)
+    assert(result._2.isEmpty)
   }
 }
