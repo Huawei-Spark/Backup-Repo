@@ -19,7 +19,7 @@ Spark HBase is built using [Apache Maven](http://maven.apache.org/).
 
 I. Clone and build Spark-Huawei/hbase (new standalone spark-hbase project)
 
-    $ git clone https://github.com/Huawei-Spark/hbase.git spark-hbase
+    $ git clone https://github.com/Huawei-Spark/SparkSQL-on-HBase spark-hbase
 ```
 II. Go to the root of the source tree
 ```
@@ -39,6 +39,23 @@ IV. Build and run test suites against a HBase minicluster, from Maven.
 The easiest way to start using Spark HBase is through the Scala shell:
 
     ./bin/hbase-sql
+
+
+## Python Shell
+
+First, add the spark-hbase jar to the SPARK_CLASSPATH in the $SPARK_HOME/conf directory, as follows:
+
+SPARK_CLASSPATH=$SPARK_CLASSPATH:/spark-hbase-root-dir/target/spark-hbase_2.10-1.4.0-SNAPSHOT.jar
+   
+
+Then go to the spark-hbase installation directory and issue
+
+   ./bin/pyspark-hbase
+
+A successfull message is as follows:
+
+   You are using Spark SQL on HBase!!!
+   HBaseSQLContext available as hsqlContext.
 
 
 ## Running Tests
