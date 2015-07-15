@@ -57,6 +57,9 @@ A successfull message is as follows:
    You are using Spark SQL on HBase!!!
    HBaseSQLContext available as hsqlContext.
 
+To run a python script, the PYTHONPATH environment should be set to the "python" directory of the Spark-HBase installation. For example,
+
+    export PYTHONPATH=/root-of-Spark-HBase/python
 
 ## Running Tests
 
