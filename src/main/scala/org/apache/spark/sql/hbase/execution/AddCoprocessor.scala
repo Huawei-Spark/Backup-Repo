@@ -132,6 +132,9 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
             val foundExprShouldBeSkipped = proj.expressions.exists(exp => {
               var found = false
               exp transform {
+                case r: Rand =>
+                  found = true
+                  r
                 case r: Randn =>
                   found = true
                   r
@@ -143,6 +146,7 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
                 // Hence, we comment it out.
                 //
                 // case s:SparkPartitionID => s
+                case c => c
               }
               found
             })
